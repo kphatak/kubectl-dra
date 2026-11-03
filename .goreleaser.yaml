@@ -1,0 +1,48 @@
+# Release builds. A pushed v* tag runs this through
+# .github/workflows/release.yaml, which uploads the archives to the GitHub
+# Release for the tag. Archive names must match the URLs in .krew.yaml.
+version: 2
+
+project_name: kubectl-dra
+
+builds:
+- id: kubectl-dra
+  main: ./cmd/kubectl-dra
+  binary: kubectl-dra
+  env:
+  - CGO_ENABLED=0
+  goos: [linux, darwin, windows]
+  goarch: [amd64, arm64]
+  flags:
+  - -trimpath
+  ldflags:
+  - -s -w -X github.com/kphatak/kubectl-dra/pkg/cmd.Version={{ .Tag }}
+
+archives:
+- id: kubectl-dra
+  # Krew installs from tar.gz on every platform, Windows included.
+  formats: [tar.gz]
+  name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}"
+  # Krew requires the license inside the archive.
+  files:
+  - LICENSE
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Tag }}_checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+    - "^Merge "
+
+release:
+  github:
+    owner: kphatak
+    name: kubectl-dra
+  # Tags with a suffix (v0.1.0-rc.1) are published as pre-releases.
+  prerelease: auto

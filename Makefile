@@ -16,7 +16,14 @@ GOLANGCI_LINT := $(CURDIR)/bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 KIND_VERSION := v0.33.0
 KIND := $(CURDIR)/bin/kind-$(KIND_VERSION)
 
-.PHONY: build test lint vet e2e e2e-up e2e-test e2e-down
+# Release tooling, for checking a release locally before tagging. The
+# release itself runs in .github/workflows/release.yaml.
+GORELEASER_VERSION := v2.19.0
+GORELEASER := $(CURDIR)/bin/goreleaser-$(GORELEASER_VERSION)
+KREW_VERSION := v0.5.0
+KREW_VALIDATE := $(CURDIR)/bin/validate-krew-manifest-$(KREW_VERSION)
+
+.PHONY: build test lint vet e2e e2e-up e2e-test e2e-down release-check release-snapshot krew-check
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/kubectl-dra ./cmd/kubectl-dra
@@ -52,3 +59,30 @@ e2e-down: $(KIND)
 $(KIND):
 	GOBIN=$(CURDIR)/bin go install sigs.k8s.io/kind@$(KIND_VERSION)
 	mv $(CURDIR)/bin/kind $@
+
+# release-check validates .goreleaser.yaml. release-snapshot builds every
+# release archive into dist/ without publishing anything. krew-check then
+# renders .krew.yaml against those archives, as krew-release-bot does, runs
+# krew-index's structural validation on the result (the download step is
+# skipped, since the release does not exist yet), and installs every
+# platform's archive with krew into a throwaway root. See
+# docs/releasing.md.
+release-check: $(GORELEASER)
+	$(GORELEASER) check
+
+release-snapshot: $(GORELEASER)
+	$(GORELEASER) release --snapshot --clean
+
+krew-check: $(KREW_VALIDATE)
+	tag=$$(ls dist/kubectl-dra_*_checksums.txt | sed -E 's|.*kubectl-dra_(.*)_checksums.txt|\1|') && \
+	hack/krew-manifest.sh $$tag > dist/dra.yaml && \
+	$(KREW_VALIDATE) -manifest dist/dra.yaml -skip-install && \
+	hack/krew-install-test.sh $$tag
+
+$(GORELEASER):
+	GOBIN=$(CURDIR)/bin go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
+	mv $(CURDIR)/bin/goreleaser $@
+
+$(KREW_VALIDATE):
+	GOBIN=$(CURDIR)/bin go install sigs.k8s.io/krew/cmd/validate-krew-manifest@$(KREW_VERSION)
+	mv $(CURDIR)/bin/validate-krew-manifest $@

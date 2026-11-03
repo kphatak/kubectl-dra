@@ -272,6 +272,11 @@ kubectl-dra is not yet in the krew index. Once it is:
 kubectl krew install dra
 ```
 
+From a release: download the archive for your platform from the
+[Releases](https://github.com/kphatak/kubectl-dra/releases) page (for example
+`kubectl-dra_v0.1.0_darwin_arm64.tar.gz`), extract it, and put
+`kubectl-dra` on your `PATH`. Each release lists the archives' checksums.
+
 From source, with Go 1.27 or newer:
 
 ```bash
@@ -393,6 +398,10 @@ make test        # unit and golden tests, with -race
 make lint        # golangci-lint, built from source with the local Go
 make e2e         # kind cluster + dra-example-driver, then the e2e tests
 ```
+
+Releases are built by goreleaser when a `v*` tag is pushed; see
+[docs/releasing.md](docs/releasing.md) for how to check a release locally,
+cut one, and submit it to krew.
 
 - Unit and golden tests run against YAML fixtures in [test/fixtures](test/fixtures). After an intended change to output, run `go test ./pkg/cmd -update` and review the diff in `pkg/cmd/testdata`.
 - The e2e tests need Docker, kubectl, helm and git; the Makefile builds a pinned kind. `make e2e` creates the cluster with its own kubeconfig under `.e2e/` (your kubeconfig is not touched), runs the tests and deletes the cluster. Use `E2E_KEEP=1` to keep it, or `make e2e-up`, `make e2e-test` and `make e2e-down` for one phase at a time. `KIND_IMAGE` selects the Kubernetes version.

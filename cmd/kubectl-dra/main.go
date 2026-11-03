@@ -8,6 +8,9 @@ import (
 	"os/signal"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	// Registers kubeconfig auth providers (OIDC) that client-go does not
+	// load by default. Exec-based credential plugins work without it.
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/kphatak/kubectl-dra/pkg/cmd"
 )

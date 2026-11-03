@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-go@v7
+      with:
+        go-version-file: go.mod
+    - run: make test
+    - uses: goreleaser/goreleaser-action@v7
+      with:
+        version: "~> v2"
+        args: release --clean
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # Opens a pull request in kubernetes-sigs/krew-index that bumps the
+    # plugin to this release, from the .krew.yaml template. The bot only
+    # updates existing plugins, so the first version is submitted by hand
+    # (see docs/releasing.md). Set the repository variable
+    # KREW_INDEX_PUBLISHED to "true" once that first submission is merged.
+    # Pre-releases are never sent to krew.
+    - name: Update krew-index
+      if: vars.KREW_INDEX_PUBLISHED == 'true' && !contains(github.ref_name, '-')
+      uses: rajatjindal/krew-release-bot@v0.0.51
