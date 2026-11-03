@@ -9,6 +9,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -77,9 +78,49 @@ func TestLoadSkipWorkloads(t *testing.T) {
 }
 
 func TestLoadV1NotServed(t *testing.T) {
-	_, err := Load(context.Background(), fakeCluster(t), LoadOptions{})
-	if err == nil || !strings.Contains(err.Error(), "does not serve resource.k8s.io/v1") {
-		t.Fatalf("got %v, want a not-served error", err)
+	tests := []struct {
+		name    string
+		version string   // server GitVersion; empty leaves the fake's default
+		served  []string // other resource.k8s.io versions the server serves
+		want    []string
+	}{
+		{
+			name:    "too old, beta API only",
+			version: "v1.33.4",
+			served:  []string{"v1beta2"},
+			want:    []string{"runs Kubernetes v1.33.4", "it serves only v1beta2", "needs Kubernetes 1.34 or newer"},
+		},
+		{
+			name:    "new enough, DRA turned off",
+			version: "v1.34.11",
+			want:    []string{"runs Kubernetes v1.34.11", "DRA is not enabled", "--runtime-config"},
+		},
+		{
+			name:    "distribution version suffix",
+			version: "v1.35.2-gke.1200",
+			want:    []string{"runs Kubernetes v1.35.2-gke.1200", "--runtime-config"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := fakeCluster(t)
+			fd := cs.Discovery().(*fakediscovery.FakeDiscovery)
+			for _, v := range tt.served {
+				fd.Resources = append(fd.Resources, &metav1.APIResourceList{GroupVersion: "resource.k8s.io/" + v})
+			}
+			if tt.version != "" {
+				fd.FakedServerVersion = &version.Info{GitVersion: tt.version}
+			}
+			_, err := Load(context.Background(), cs, LoadOptions{})
+			if err == nil {
+				t.Fatal("want an error")
+			}
+			for _, w := range tt.want {
+				if !strings.Contains(err.Error(), w) {
+					t.Errorf("error %q does not contain %q", err, w)
+				}
+			}
+		})
 	}
 }
 

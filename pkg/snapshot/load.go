@@ -12,6 +12,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/pager"
@@ -97,7 +98,7 @@ func servedResources(dc discovery.DiscoveryInterface) (map[string]bool, error) {
 	gv := resourceapi.SchemeGroupVersion.String()
 	list, err := dc.ServerResourcesForGroupVersion(gv)
 	if apierrors.IsNotFound(err) {
-		return nil, fmt.Errorf("the cluster does not serve %s%s; kubectl-dra needs Kubernetes 1.34 or newer", gv, otherResourceVersions(dc))
+		return nil, notServedError(dc)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("discovering %s: %w", gv, err)
@@ -109,24 +110,48 @@ func servedResources(dc discovery.DiscoveryInterface) (map[string]bool, error) {
 	return served, nil
 }
 
-// otherResourceVersions names the resource.k8s.io versions the server does
-// serve, to make the "not served" error actionable.
-func otherResourceVersions(dc discovery.DiscoveryInterface) string {
+// minVersion is the first Kubernetes release that serves resource.k8s.io/v1.
+var minVersion = version.MustParseGeneric("1.34.0")
+
+// notServedError explains why resource.k8s.io/v1 is missing, using the
+// server version to tell "too old" apart from "DRA turned off".
+func notServedError(dc discovery.DiscoveryInterface) error {
+	gv := resourceapi.SchemeGroupVersion.String()
+	served := "DRA is not enabled"
+	if versions := otherResourceVersions(dc); len(versions) > 0 {
+		served = "it serves only " + strings.Join(versions, ", ")
+	}
+
+	info, err := dc.ServerVersion()
+	if err != nil {
+		return fmt.Errorf("the cluster does not serve %s (%s); kubectl-dra needs Kubernetes 1.34 or newer with DRA enabled", gv, served)
+	}
+	v, err := version.ParseGeneric(info.GitVersion)
+	if err != nil || v.AtLeast(minVersion) {
+		return fmt.Errorf("the cluster runs Kubernetes %s but does not serve %s (%s); "+
+			"check the API server's --runtime-config and DRA feature gates", info.GitVersion, gv, served)
+	}
+	return fmt.Errorf("the cluster runs Kubernetes %s and does not serve %s (%s); kubectl-dra needs Kubernetes 1.34 or newer",
+		info.GitVersion, gv, served)
+}
+
+// otherResourceVersions lists the resource.k8s.io versions the server does
+// serve, if any.
+func otherResourceVersions(dc discovery.DiscoveryInterface) []string {
 	groups, err := dc.ServerGroups()
 	if err != nil {
-		return ""
+		return nil
 	}
+	var versions []string
 	for _, g := range groups.Groups {
 		if g.Name != resourceapi.GroupName {
 			continue
 		}
-		var versions []string
 		for _, v := range g.Versions {
 			versions = append(versions, v.Version)
 		}
-		return fmt.Sprintf(" (it serves %s)", strings.Join(versions, ", "))
 	}
-	return " (DRA is not enabled)"
+	return versions
 }
 
 type loader struct {

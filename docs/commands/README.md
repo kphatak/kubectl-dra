@@ -38,6 +38,11 @@ the claim, and writes the result to the claim's `status.allocation`. A
 
 ### One snapshot per command
 
+Before listing anything, each command checks with one discovery request that
+the API server serves `resource.k8s.io/v1`. If it does not, the command exits
+with code 1 and a message that says whether the cluster is too old or has DRA
+turned off; see [Clusters without DRA](../../README.md#clusters-without-dra).
+
 Each command lists the objects it needs once, in parallel and in pages, and
 then works only on that snapshot. Nothing is created, changed or deleted, and
 nothing runs in the cluster. The output is therefore consistent within one

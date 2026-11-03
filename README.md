@@ -325,8 +325,35 @@ continue and print a warning. See [docs/rbac.md](docs/rbac.md).
 | Tested on | 1.34.11 and 1.37.0, with kind and [dra-example-driver](https://github.com/kubernetes-sigs/dra-example-driver) v0.5.0 |
 | Built against | `k8s.io/*` v0.37.2 |
 
-Older clusters that serve only `v1beta1` or `v1beta2` get a clear error
-naming the versions they do serve.
+### Clusters without DRA
+
+Every command checks first, with one discovery request, that the API server
+serves `resource.k8s.io/v1`. If it does not, the command stops before
+listing anything, prints the reason on stderr, writes nothing to stdout
+(so `-o json` pipelines never see half a document), and exits with code 1.
+Against a kind cluster that took about a second on the first call and a few
+hundredths of a second after that.
+
+The message tells "too old" apart from "turned off":
+
+```console
+$ kubectl dra pools     # Kubernetes 1.33, which only has the beta API
+Error: the cluster runs Kubernetes v1.33.4 and does not serve resource.k8s.io/v1 (it serves only v1beta2); kubectl-dra needs Kubernetes 1.34 or newer
+
+$ kubectl dra pools     # Kubernetes 1.34 with the API disabled
+Error: the cluster runs Kubernetes v1.34.11 but does not serve resource.k8s.io/v1 (DRA is not enabled); check the API server's --runtime-config and DRA feature gates
+```
+
+A cluster that serves the API but has no DRA driver installed is not an
+error: the commands run and show empty results (`No pools found.`), which
+is the correct answer.
+
+`kubectl dra version` and `--help` work without contacting a cluster. For an
+API server that is unreachable rather than missing DRA, kubectl's usual
+connection errors apply; pass `--request-timeout=10s` to bound the wait, as
+with kubectl itself.
+
+### Feature coverage
 
 Newer DRA features are recognized when present, and the allocator check in
 `why` accounts for all of them. The funnel explains prioritized lists, admin
