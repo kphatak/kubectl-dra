@@ -1,0 +1,4 @@
+DRIVER            POOL     DEVICE   NODES    STATUS        CLAIMS
+gpu.example.com   node-a   gpu-0    node-a   Allocated     team-a/train
+gpu.example.com   node-a   gpu-1    node-a   Tainted       <none>
+gpu.example.com   node-b   gpu-0    node-b   Unavailable   <none>

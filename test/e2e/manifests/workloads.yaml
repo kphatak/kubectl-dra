@@ -1,0 +1,127 @@
+# Claims the e2e tests expect the scheduler to allocate, and claims it must
+# leave pending. dra-example-driver installs the gpu.example.com DeviceClass.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dra-e2e
+---
+# Good: one GPU through a claim template.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: single-gpu
+  namespace: dra-e2e
+spec:
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu.example.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: one-gpu
+  namespace: dra-e2e
+spec:
+  containers:
+  - name: ctr
+    image: registry.k8s.io/pause:3.10
+    resources:
+      claims:
+      - name: gpu
+  resourceClaims:
+  - name: gpu
+    resourceClaimTemplateName: single-gpu
+---
+# Good: two GPUs through a standalone claim.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: two-gpus
+  namespace: dra-e2e
+spec:
+  devices:
+    requests:
+    - name: gpus
+      exactly:
+        deviceClassName: gpu.example.com
+        count: 2
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: two-gpus
+  namespace: dra-e2e
+spec:
+  containers:
+  - name: ctr
+    image: registry.k8s.io/pause:3.10
+    resources:
+      claims:
+      - name: gpus
+  resourceClaims:
+  - name: gpus
+    resourceClaimName: two-gpus
+---
+# Bad: the DeviceClass does not exist.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: missing-class
+  namespace: dra-e2e
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly:
+        deviceClassName: does-not-exist
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: missing-class
+  namespace: dra-e2e
+spec:
+  containers:
+  - name: ctr
+    image: registry.k8s.io/pause:3.10
+    resources:
+      claims:
+      - name: gpu
+  resourceClaims:
+  - name: gpu
+    resourceClaimName: missing-class
+---
+# Bad: no device matches the selector.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: no-match
+  namespace: dra-e2e
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly:
+        deviceClassName: gpu.example.com
+        selectors:
+        - cel:
+            expression: device.attributes["gpu.example.com"].model == "does-not-exist"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: no-match
+  namespace: dra-e2e
+spec:
+  containers:
+  - name: ctr
+    image: registry.k8s.io/pause:3.10
+    resources:
+      claims:
+      - name: gpu
+  resourceClaims:
+  - name: gpu
+    resourceClaimName: no-match

@@ -1,0 +1,94 @@
+{
+  "pools": [
+    {
+      "driver": "gpu.example.com",
+      "pool": "duplicate",
+      "nodeScope": "node-b",
+      "generation": 1,
+      "slices": 2,
+      "resourceSliceCount": 2,
+      "outdatedSlices": 0,
+      "devices": 2,
+      "allocated": 0,
+      "status": "Invalid",
+      "problems": [
+        "device name \"gpu-0\" is published by both duplicate-part1 and duplicate-part2, which makes the pool invalid"
+      ]
+    },
+    {
+      "driver": "gpu.example.com",
+      "pool": "mismatch",
+      "nodeScope": "node-b",
+      "generation": 1,
+      "slices": 2,
+      "resourceSliceCount": 0,
+      "outdatedSlices": 0,
+      "devices": 2,
+      "allocated": 0,
+      "status": "Invalid",
+      "problems": [
+        "slices at generation 1 disagree on resourceSliceCount (2, 3), so the scheduler's view depends on slice order"
+      ]
+    },
+    {
+      "driver": "gpu.example.com",
+      "pool": "node-a",
+      "nodeScope": "node-a",
+      "generation": 2,
+      "slices": 2,
+      "resourceSliceCount": 2,
+      "outdatedSlices": 1,
+      "devices": 4,
+      "allocated": 4,
+      "status": "Complete"
+    },
+    {
+      "driver": "gpu.example.com",
+      "pool": "node-b",
+      "nodeScope": "node-b",
+      "generation": 1,
+      "slices": 1,
+      "resourceSliceCount": 2,
+      "outdatedSlices": 0,
+      "devices": 1,
+      "allocated": 0,
+      "status": "Incomplete"
+    },
+    {
+      "driver": "link.example.com",
+      "pool": "rack-r1",
+      "nodeScope": "mixed (3)",
+      "generation": 1,
+      "slices": 1,
+      "resourceSliceCount": 1,
+      "outdatedSlices": 0,
+      "devices": 3,
+      "allocated": 0,
+      "status": "Complete"
+    },
+    {
+      "driver": "net.example.com",
+      "pool": "fabric",
+      "nodeScope": "all nodes",
+      "generation": 1,
+      "slices": 1,
+      "resourceSliceCount": 1,
+      "outdatedSlices": 0,
+      "devices": 1,
+      "allocated": 0,
+      "status": "Complete"
+    },
+    {
+      "driver": "storage.example.com",
+      "pool": "zone-a",
+      "nodeScope": "topology.kubernetes.io/zone In (a)",
+      "generation": 1,
+      "slices": 1,
+      "resourceSliceCount": 1,
+      "outdatedSlices": 0,
+      "devices": 1,
+      "allocated": 0,
+      "status": "Complete"
+    }
+  ]
+}

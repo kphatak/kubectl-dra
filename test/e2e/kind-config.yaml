@@ -1,0 +1,17 @@
+# kind cluster for the e2e tests: one control plane and two workers, each
+# worker publishing a pool of fake GPUs through dra-example-driver.
+#
+# run.sh appends featureGates that depend on the Kubernetes version, since
+# components refuse to start with a gate they do not know.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+# The example driver injects devices through CDI. Same patch as
+# dra-example-driver's own kind config.
+- |-
+  [plugins."io.containerd.grpc.v1.cri"]
+    enable_cdi = true
+nodes:
+- role: control-plane
+- role: worker
+- role: worker

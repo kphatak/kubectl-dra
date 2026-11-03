@@ -1,0 +1,29 @@
+version: "2"
+
+run:
+  # Lint the e2e tests too; they only build with this tag.
+  build-tags:
+    - e2e
+
+linters:
+  enable:
+    - errorlint
+    - misspell
+    - nolintlint
+    - unconvert
+  settings:
+    errcheck:
+      exclude-functions:
+        # Table output goes through tabwriter, whose Flush error is checked.
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/kphatak/kubectl-dra

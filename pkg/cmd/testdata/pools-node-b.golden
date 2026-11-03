@@ -1,0 +1,6 @@
+DRIVER             POOL        NODES       GENERATION   SLICES   DEVICES   ALLOCATED   STATUS
+gpu.example.com    duplicate   node-b      1            2/2      2         0           Invalid
+gpu.example.com    mismatch    node-b      1            2/?      2         0           Invalid
+gpu.example.com    node-b      node-b      1            1/2      1         0           Incomplete
+link.example.com   rack-r1     mixed (3)   1            1/1      3         0           Complete
+net.example.com    fabric      all nodes   1            1/1      1         0           Complete

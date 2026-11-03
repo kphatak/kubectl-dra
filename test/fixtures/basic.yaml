@@ -1,0 +1,126 @@
+# One node publishing two fake GPUs via dra-example-driver. One pod holds a
+# template-generated claim allocated to gpu-0. The trailing List document
+# mimics "kubectl get -o yaml" output and includes a kind kubectl-dra ignores.
+apiVersion: v1
+kind: Node
+metadata:
+  name: kind-worker
+  labels:
+    kubernetes.io/hostname: kind-worker
+---
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: gpu.example.com
+spec:
+  selectors:
+  - cel:
+      expression: device.driver == 'gpu.example.com'
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: kind-worker-gpu.example.com-abcde
+spec:
+  driver: gpu.example.com
+  nodeName: kind-worker
+  pool:
+    name: kind-worker
+    generation: 1
+    resourceSliceCount: 1
+  devices:
+  - name: gpu-0
+    attributes:
+      index:
+        int: 0
+      model:
+        string: LATEST-GPU-MODEL
+      driverVersion:
+        version: 1.0.0
+    capacity:
+      memory:
+        value: 80Gi
+  - name: gpu-1
+    attributes:
+      index:
+        int: 1
+      model:
+        string: LATEST-GPU-MODEL
+      driverVersion:
+        version: 1.0.0
+    capacity:
+      memory:
+        value: 80Gi
+---
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: pod0
+    namespace: gpu-test
+    uid: 5f0c4a8e-0000-0000-0000-000000000001
+  spec:
+    nodeName: kind-worker
+    containers:
+    - name: ctr0
+      image: ubuntu:24.04
+      resources:
+        claims:
+        - name: gpu
+    resourceClaims:
+    - name: gpu
+      resourceClaimTemplateName: single-gpu
+  status:
+    phase: Running
+    resourceClaimStatuses:
+    - name: gpu
+      resourceClaimName: pod0-gpu-x7k2p
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaimTemplate
+  metadata:
+    name: single-gpu
+    namespace: gpu-test
+  spec:
+    spec:
+      devices:
+        requests:
+        - name: gpu
+          exactly:
+            deviceClassName: gpu.example.com
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata:
+    name: pod0-gpu-x7k2p
+    namespace: gpu-test
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu.example.com
+  status:
+    allocation:
+      devices:
+        results:
+        - request: gpu
+          driver: gpu.example.com
+          pool: kind-worker
+          device: gpu-0
+      nodeSelector:
+        nodeSelectorTerms:
+        - matchFields:
+          - key: metadata.name
+            operator: In
+            values:
+            - kind-worker
+    reservedFor:
+    - resource: pods
+      name: pod0
+      uid: 5f0c4a8e-0000-0000-0000-000000000001
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: unrelated
+    namespace: gpu-test

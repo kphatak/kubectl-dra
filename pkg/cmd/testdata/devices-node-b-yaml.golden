@@ -1,0 +1,35 @@
+devices:
+- attributes:
+    index:
+      int: 0
+    model:
+      string: A100
+  capacity:
+    memory:
+      value: 80Gi
+  device: gpu-0
+  driver: gpu.example.com
+  nodeScope: node-b
+  pool: node-b
+  reason: pool is incomplete (1 of 2 slices)
+  status: Unavailable
+- attributes:
+    speed:
+      string: 400G
+  capacity:
+    bandwidth:
+      value: "400"
+  claims:
+  - name: net-1
+    namespace: team-a
+    request: nic
+    shareID: 7d2e3f4a-0000-0000-0000-000000000001
+  - name: net-2
+    namespace: team-b
+    request: nic
+    shareID: 7d2e3f4a-0000-0000-0000-000000000002
+  device: nic-0
+  driver: net.example.com
+  nodeScope: all nodes
+  pool: fabric
+  status: Shared

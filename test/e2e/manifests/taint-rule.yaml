@@ -1,0 +1,15 @@
+# Taints gpu-7 on every gpu.example.com pool before any workload is
+# scheduled, so the e2e can check rule-added taints. NoSchedule keeps the
+# scheduler off those devices without evicting anything.
+apiVersion: resource.k8s.io/v1
+kind: DeviceTaintRule
+metadata:
+  name: e2e-taint-gpu-7
+spec:
+  deviceSelector:
+    driver: gpu.example.com
+    device: gpu-7
+  taint:
+    key: example.com/e2e
+    value: maintenance
+    effect: NoSchedule

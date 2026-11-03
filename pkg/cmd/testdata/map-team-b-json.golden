@@ -1,0 +1,16 @@
+{
+  "rows": [
+    {
+      "namespace": "team-b",
+      "consumer": "pod/other",
+      "reserved": true,
+      "claim": "other",
+      "request": "gpu",
+      "driver": "gpu.example.com",
+      "pool": "node-b",
+      "device": "gpu-0",
+      "node": "node-b",
+      "status": "Allocated"
+    }
+  ]
+}

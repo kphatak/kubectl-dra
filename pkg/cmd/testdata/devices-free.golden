@@ -1,0 +1,2 @@
+DRIVER            POOL     DEVICE   NODES    STATUS   CLAIMS
+gpu.example.com   node-a   gpu-3    node-a   Free     ops/monitor (admin)

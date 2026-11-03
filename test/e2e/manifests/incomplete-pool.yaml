@@ -1,0 +1,17 @@
+# A hand-made pool that declares two slices but publishes one, so the e2e
+# can check that "pools" reports Incomplete against a real API server. No
+# driver serves fake.example.com; nothing will try to use these devices.
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: e2e-incomplete-part1
+spec:
+  driver: fake.example.com
+  allNodes: true
+  pool:
+    name: incomplete
+    generation: 1
+    resourceSliceCount: 2
+  devices:
+  - name: dev-0
+  - name: dev-1

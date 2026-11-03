@@ -1,0 +1,236 @@
+# Pods and claims in every relationship the map command shows.
+#
+# team-a:
+#   pod train        template claim train-gpu-x1, allocated gpu-0 on node-a
+#   pods web-1/2     share standalone claim shared-nic (network device, all nodes)
+#   pod big          claim big, pending (8 GPUs requested)
+#   pod prio         claim prio, firstAvailable chose subrequest "large"
+#   pod not-yet      template claim not created yet
+#   pod typo         references claim does-not-exist
+#   pod skipped      template claim intentionally not created (no row)
+#   claim orphan     allocated, nothing uses it
+#   claim workload   reserved for a PodGroup, allocated on node-b
+# team-b:
+#   pod other        claim other, allocated gpu-0 on node-b
+apiVersion: v1
+kind: Node
+metadata: {name: node-a}
+---
+apiVersion: v1
+kind: Node
+metadata: {name: node-b}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: train, namespace: team-a, uid: 00000000-0000-0000-0000-00000000a001}
+spec:
+  nodeName: node-a
+  containers: [{name: c, image: pause}]
+  resourceClaims:
+  - {name: gpu, resourceClaimTemplateName: one-gpu}
+status:
+  resourceClaimStatuses:
+  - {name: gpu, resourceClaimName: train-gpu-x1}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: train-gpu-x1
+  namespace: team-a
+  ownerReferences:
+  - {apiVersion: v1, kind: Pod, name: train, uid: 00000000-0000-0000-0000-00000000a001, controller: true}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: gpu, driver: gpu.example.com, pool: node-a, device: gpu-0}
+    nodeSelector:
+      nodeSelectorTerms:
+      - matchFields:
+        - {key: metadata.name, operator: In, values: [node-a]}
+  reservedFor:
+  - {resource: pods, name: train, uid: 00000000-0000-0000-0000-00000000a001}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: web-1, namespace: team-a, uid: 00000000-0000-0000-0000-00000000a002}
+spec:
+  nodeName: node-a
+  containers: [{name: c, image: pause}]
+  resourceClaims:
+  - {name: nic, resourceClaimName: shared-nic}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: web-2, namespace: team-a, uid: 00000000-0000-0000-0000-00000000a003}
+spec:
+  nodeName: node-b
+  containers: [{name: c, image: pause}]
+  resourceClaims:
+  - {name: nic, resourceClaimName: shared-nic}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: shared-nic, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: nic
+      exactly: {deviceClassName: nic.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: nic, driver: net.example.com, pool: fabric, device: nic-0}
+  reservedFor:
+  - {resource: pods, name: web-1, uid: 00000000-0000-0000-0000-00000000a002}
+  - {resource: pods, name: web-2, uid: 00000000-0000-0000-0000-00000000a003}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: big, namespace: team-a, uid: 00000000-0000-0000-0000-00000000a004}
+spec:
+  containers: [{name: c, image: pause}]
+  resourceClaims:
+  - {name: gpus, resourceClaimName: big}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: big, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpus
+      exactly: {deviceClassName: gpu.example.com, count: 8}
+    - name: nic
+      exactly: {deviceClassName: nic.example.com}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: prio, namespace: team-a, uid: 00000000-0000-0000-0000-00000000a005}
+spec:
+  nodeName: node-b
+  containers: [{name: c, image: pause}]
+  resourceClaims:
+  - {name: gpu, resourceClaimName: prio}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: prio, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      firstAvailable:
+      - {name: large, deviceClassName: gpu.example.com}
+      - {name: small, deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: gpu/large, driver: gpu.example.com, pool: node-b, device: gpu-3}
+    nodeSelector:
+      nodeSelectorTerms:
+      - matchFields:
+        - {key: metadata.name, operator: In, values: [node-b]}
+  reservedFor:
+  - {resource: pods, name: prio, uid: 00000000-0000-0000-0000-00000000a005}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: not-yet, namespace: team-a, uid: 00000000-0000-0000-0000-00000000a006}
+spec:
+  containers: [{name: c, image: pause}]
+  resourceClaims:
+  - {name: gpu, resourceClaimTemplateName: one-gpu}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: typo, namespace: team-a, uid: 00000000-0000-0000-0000-00000000a007}
+spec:
+  containers: [{name: c, image: pause}]
+  resourceClaims:
+  - {name: gpu, resourceClaimName: does-not-exist}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: skipped, namespace: team-a, uid: 00000000-0000-0000-0000-00000000a008}
+spec:
+  containers: [{name: c, image: pause}]
+  resourceClaims:
+  - {name: gpu, resourceClaimTemplateName: one-gpu}
+status:
+  resourceClaimStatuses:
+  - {name: gpu}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: orphan, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: gpu, driver: gpu.example.com, pool: node-a, device: gpu-1}
+    nodeSelector:
+      nodeSelectorTerms:
+      - matchFields:
+        - {key: metadata.name, operator: In, values: [node-a]}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: workload, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: gpu, driver: gpu.example.com, pool: node-b, device: gpu-1}
+    nodeSelector:
+      nodeSelectorTerms:
+      - matchFields:
+        - {key: metadata.name, operator: In, values: [node-b]}
+  reservedFor:
+  - {apiGroup: scheduling.k8s.io, resource: podgroups, name: train-group, uid: 00000000-0000-0000-0000-00000000b001}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: other, namespace: team-b, uid: 00000000-0000-0000-0000-00000000c001}
+spec:
+  nodeName: node-b
+  containers: [{name: c, image: pause}]
+  resourceClaims:
+  - {name: gpu, resourceClaimName: other}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: other, namespace: team-b}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: gpu, driver: gpu.example.com, pool: node-b, device: gpu-0}
+    nodeSelector:
+      nodeSelectorTerms:
+      - matchFields:
+        - {key: metadata.name, operator: In, values: [node-b]}
+  reservedFor:
+  - {resource: pods, name: other, uid: 00000000-0000-0000-0000-00000000c001}

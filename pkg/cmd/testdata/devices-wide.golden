@@ -1,0 +1,7 @@
+DRIVER            POOL     DEVICE   NODES       STATUS        CLAIMS                      TAINTS                                      REASON                               ATTRIBUTES
+gpu.example.com   node-a   gpu-0    node-a      Allocated     team-a/train                <none>                                      <none>                               index=0,model=A100
+gpu.example.com   node-a   gpu-1    node-a      Tainted       <none>                      example.com/maintenance:NoSchedule          <none>                               index=1,model=A100
+gpu.example.com   node-a   gpu-2    node-a      Tainted       <none>                      example.com/drain:NoExecute (drain-gpu-2)   <none>                               index=2,model=L4
+gpu.example.com   node-a   gpu-3    node-a      Free          ops/monitor (admin)         example.com/ecc-warning=1:None              <none>                               index=3,model=L4
+gpu.example.com   node-b   gpu-0    node-b      Unavailable   <none>                      <none>                                      pool is incomplete (1 of 2 slices)   index=0,model=A100
+net.example.com   fabric   nic-0    all nodes   Shared        team-a/net-1,team-b/net-2   <none>                                      <none>                               speed=400G

@@ -1,0 +1,11 @@
+pools:
+- allocated: 0
+  devices: 1
+  driver: net.example.com
+  generation: 1
+  nodeScope: all nodes
+  outdatedSlices: 0
+  pool: fabric
+  resourceSliceCount: 1
+  slices: 1
+  status: Complete

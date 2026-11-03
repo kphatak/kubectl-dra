@@ -1,0 +1,2 @@
+DRIVER            POOL     DEVICE   NODES       STATUS   CLAIMS
+net.example.com   fabric   nic-0    all nodes   Shared   team-a/net-1,team-b/net-2

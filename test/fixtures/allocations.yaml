@@ -1,0 +1,112 @@
+# Claims covering each way a device can be held. All devices are in pool
+# gpu.example.com/node-a.
+#   gpu-0: dedicated to "dedicated", also watched by "monitor" with admin access
+#   gpu-1: shared by "shared-1" and "shared-2" through consumable capacity
+#   gpu-2: chosen for subrequest "large" of firstAvailable request "gpu"
+#   gpu-3: dedicated to a claim in another namespace
+#   gpu-4: only held with admin access, so still free
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: dedicated, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: gpu, driver: gpu.example.com, pool: node-a, device: gpu-0}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: monitor, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: monitor
+      exactly: {deviceClassName: gpu.example.com, allocationMode: All, adminAccess: true}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: monitor, driver: gpu.example.com, pool: node-a, device: gpu-0, adminAccess: true}
+      - {request: monitor, driver: gpu.example.com, pool: node-a, device: gpu-4, adminAccess: true}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: shared-1, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - request: gpu
+        driver: gpu.example.com
+        pool: node-a
+        device: gpu-1
+        shareID: 6c1d2f9a-0000-0000-0000-000000000001
+        consumedCapacity: {memory: 10Gi}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: shared-2, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - request: gpu
+        driver: gpu.example.com
+        pool: node-a
+        device: gpu-1
+        shareID: 6c1d2f9a-0000-0000-0000-000000000002
+        consumedCapacity: {memory: 20Gi}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: prioritized, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      firstAvailable:
+      - {name: large, deviceClassName: gpu.example.com}
+      - {name: small, deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: gpu/large, driver: gpu.example.com, pool: node-a, device: gpu-2}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: other, namespace: team-b}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu.example.com}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: gpu, driver: gpu.example.com, pool: node-a, device: gpu-3}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: pending, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu.example.com}

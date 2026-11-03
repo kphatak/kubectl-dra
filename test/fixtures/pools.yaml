@@ -1,0 +1,163 @@
+# Pools in every state the pool analyzer distinguishes, plus each kind of
+# node scope. Two nodes: node-a (zone a, rack r1) and node-b (zone b).
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-a
+  labels:
+    topology.kubernetes.io/zone: a
+    example.com/rack: r1
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-b
+  labels:
+    topology.kubernetes.io/zone: b
+---
+# gpu.example.com/node-a: complete at generation 2 across two slices. The
+# generation 1 slice is left over from a republish and must be ignored, even
+# though it reuses the device name gpu-0.
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: node-a-gen1
+spec:
+  driver: gpu.example.com
+  nodeName: node-a
+  pool: {name: node-a, generation: 1, resourceSliceCount: 1}
+  devices:
+  - name: gpu-0
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: node-a-gen2-part1
+spec:
+  driver: gpu.example.com
+  nodeName: node-a
+  pool: {name: node-a, generation: 2, resourceSliceCount: 2}
+  devices:
+  - name: gpu-0
+  - name: gpu-1
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: node-a-gen2-part2
+spec:
+  driver: gpu.example.com
+  nodeName: node-a
+  pool: {name: node-a, generation: 2, resourceSliceCount: 2}
+  devices:
+  - name: gpu-2
+  - name: gpu-3
+---
+# gpu.example.com/node-b: incomplete, declares two slices but only one exists.
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: node-b-part1
+spec:
+  driver: gpu.example.com
+  nodeName: node-b
+  pool: {name: node-b, generation: 1, resourceSliceCount: 2}
+  devices:
+  - name: gpu-0
+---
+# gpu.example.com/duplicate: complete but invalid, gpu-0 appears twice.
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: duplicate-part1
+spec:
+  driver: gpu.example.com
+  nodeName: node-b
+  pool: {name: duplicate, generation: 1, resourceSliceCount: 2}
+  devices:
+  - name: gpu-0
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: duplicate-part2
+spec:
+  driver: gpu.example.com
+  nodeName: node-b
+  pool: {name: duplicate, generation: 1, resourceSliceCount: 2}
+  devices:
+  - name: gpu-0
+---
+# gpu.example.com/mismatch: slices at the same generation disagree on the
+# slice count.
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: mismatch-part1
+spec:
+  driver: gpu.example.com
+  nodeName: node-b
+  pool: {name: mismatch, generation: 1, resourceSliceCount: 2}
+  devices:
+  - name: gpu-0
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: mismatch-part2
+spec:
+  driver: gpu.example.com
+  nodeName: node-b
+  pool: {name: mismatch, generation: 1, resourceSliceCount: 3}
+  devices:
+  - name: gpu-1
+---
+# net.example.com/fabric: network-attached, reachable from every node.
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: fabric
+spec:
+  driver: net.example.com
+  allNodes: true
+  pool: {name: fabric, generation: 1, resourceSliceCount: 1}
+  devices:
+  - name: nic-0
+---
+# storage.example.com/zone-a: reachable from nodes in zone a.
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: zone-a
+spec:
+  driver: storage.example.com
+  nodeSelector:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: topology.kubernetes.io/zone
+        operator: In
+        values: [a]
+  pool: {name: zone-a, generation: 1, resourceSliceCount: 1}
+  devices:
+  - name: vol-0
+---
+# link.example.com/rack-r1: node selection set per device.
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: rack-r1
+spec:
+  driver: link.example.com
+  perDeviceNodeSelection: true
+  pool: {name: rack-r1, generation: 1, resourceSliceCount: 1}
+  devices:
+  - name: link-0
+    nodeName: node-a
+  - name: link-1
+    allNodes: true
+  - name: link-2
+    nodeSelector:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: example.com/rack
+          operator: Exists

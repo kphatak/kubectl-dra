@@ -1,0 +1,196 @@
+# Devices in every status the devices command reports.
+#
+#   gpu.example.com/node-a/gpu-0   Allocated    dedicated to team-a/train
+#   gpu.example.com/node-a/gpu-1   Tainted      own NoSchedule taint from the driver
+#   gpu.example.com/node-a/gpu-2   Tainted      NoExecute taint from DeviceTaintRule drain-gpu-2
+#   gpu.example.com/node-a/gpu-3   Free         taint with effect None, and an admin access holder
+#   gpu.example.com/node-b/gpu-0   Unavailable  pool declares 2 slices, only 1 published
+#   net.example.com/fabric/nic-0   Shared       two claims with shareIDs
+#
+# DeviceClasses: gpu (all GPUs), big-gpu (40Gi or more), broken (runtime
+# error on a missing attribute), bad-syntax (compile error).
+apiVersion: v1
+kind: Node
+metadata: {name: node-a}
+---
+apiVersion: v1
+kind: Node
+metadata: {name: node-b}
+---
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata: {name: gpu}
+spec:
+  selectors:
+  - cel: {expression: "device.driver == 'gpu.example.com'"}
+---
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata: {name: big-gpu}
+spec:
+  selectors:
+  - cel: {expression: "device.driver == 'gpu.example.com'"}
+  - cel: {expression: "device.capacity['gpu.example.com'].memory.compareTo(quantity('40Gi')) >= 0"}
+---
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata: {name: broken}
+spec:
+  selectors:
+  - cel: {expression: "device.attributes['gpu.example.com'].nosuch == 1"}
+---
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata: {name: bad-syntax}
+spec:
+  selectors:
+  - cel: {expression: "device.driver =="}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata: {name: node-a-gpus}
+spec:
+  driver: gpu.example.com
+  nodeName: node-a
+  pool: {name: node-a, generation: 1, resourceSliceCount: 1}
+  devices:
+  - name: gpu-0
+    attributes:
+      model: {string: A100}
+      index: {int: 0}
+    capacity:
+      memory: {value: 80Gi}
+  - name: gpu-1
+    attributes:
+      model: {string: A100}
+      index: {int: 1}
+    capacity:
+      memory: {value: 80Gi}
+    taints:
+    - {key: example.com/maintenance, effect: NoSchedule}
+  - name: gpu-2
+    attributes:
+      model: {string: L4}
+      index: {int: 2}
+    capacity:
+      memory: {value: 24Gi}
+  - name: gpu-3
+    attributes:
+      model: {string: L4}
+      index: {int: 3}
+    capacity:
+      memory: {value: 24Gi}
+    taints:
+    - {key: example.com/ecc-warning, value: "1", effect: None}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata: {name: node-b-gpus-part1}
+spec:
+  driver: gpu.example.com
+  nodeName: node-b
+  pool: {name: node-b, generation: 1, resourceSliceCount: 2}
+  devices:
+  - name: gpu-0
+    attributes:
+      model: {string: A100}
+      index: {int: 0}
+    capacity:
+      memory: {value: 80Gi}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata: {name: fabric}
+spec:
+  driver: net.example.com
+  allNodes: true
+  pool: {name: fabric, generation: 1, resourceSliceCount: 1}
+  devices:
+  - name: nic-0
+    attributes:
+      speed: {string: 400G}
+    capacity:
+      bandwidth: {value: "400"}
+---
+apiVersion: resource.k8s.io/v1
+kind: DeviceTaintRule
+metadata: {name: drain-gpu-2}
+spec:
+  deviceSelector:
+    driver: gpu.example.com
+    pool: node-a
+    device: gpu-2
+  taint: {key: example.com/drain, effect: NoExecute}
+---
+# A rule without a selector matches no device.
+apiVersion: resource.k8s.io/v1
+kind: DeviceTaintRule
+metadata: {name: no-selector}
+spec:
+  taint: {key: example.com/everything, effect: NoSchedule}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: train, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly: {deviceClassName: gpu}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: gpu, driver: gpu.example.com, pool: node-a, device: gpu-0}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: monitor, namespace: ops}
+spec:
+  devices:
+    requests:
+    - name: all
+      exactly: {deviceClassName: gpu, allocationMode: All, adminAccess: true}
+status:
+  allocation:
+    devices:
+      results:
+      - {request: all, driver: gpu.example.com, pool: node-a, device: gpu-3, adminAccess: true}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: net-1, namespace: team-a}
+spec:
+  devices:
+    requests:
+    - name: nic
+      exactly: {deviceClassName: nic}
+status:
+  allocation:
+    devices:
+      results:
+      - request: nic
+        driver: net.example.com
+        pool: fabric
+        device: nic-0
+        shareID: 7d2e3f4a-0000-0000-0000-000000000001
+        consumedCapacity: {bandwidth: "100"}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata: {name: net-2, namespace: team-b}
+spec:
+  devices:
+    requests:
+    - name: nic
+      exactly: {deviceClassName: nic}
+status:
+  allocation:
+    devices:
+      results:
+      - request: nic
+        driver: net.example.com
+        pool: fabric
+        device: nic-0
+        shareID: 7d2e3f4a-0000-0000-0000-000000000002
+        consumedCapacity: {bandwidth: "100"}

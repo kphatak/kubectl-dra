@@ -1,0 +1,12 @@
+NAMESPACE   CONSUMER                CLAIM            REQUEST     DRIVER            POOL     DEVICE   NODE     STATUS
+team-a      pod/big                 big              gpus        <none>            <none>   <none>   <none>   Pending
+team-a      pod/big                 big              nic         <none>            <none>   <none>   <none>   Pending
+team-a      pod/not-yet             <none>           <none>      <none>            <none>   <none>   <none>   NotCreated
+team-a      pod/prio                prio             gpu/large   gpu.example.com   node-b   gpu-3    node-b   Allocated
+team-a      pod/train               train-gpu-x1     gpu         gpu.example.com   node-a   gpu-0    node-a   Allocated
+team-a      pod/typo                does-not-exist   <none>      <none>            <none>   <none>   <none>   Missing
+team-a      pod/web-1               shared-nic       nic         net.example.com   fabric   nic-0    node-a   Allocated
+team-a      pod/web-2               shared-nic       nic         net.example.com   fabric   nic-0    node-b   Allocated
+team-a      podgroups/train-group   workload         gpu         gpu.example.com   node-b   gpu-1    node-b   Allocated
+team-a      <none>                  orphan           gpu         gpu.example.com   node-a   gpu-1    node-a   Allocated
+team-b      pod/other               other            gpu         gpu.example.com   node-b   gpu-0    node-b   Allocated

@@ -1,0 +1,171 @@
+{
+  "devices": [
+    {
+      "driver": "gpu.example.com",
+      "pool": "node-a",
+      "device": "gpu-0",
+      "nodeScope": "node-a",
+      "status": "Allocated",
+      "claims": [
+        {
+          "namespace": "team-a",
+          "name": "train",
+          "request": "gpu"
+        }
+      ],
+      "attributes": {
+        "index": {
+          "int": 0
+        },
+        "model": {
+          "string": "A100"
+        }
+      },
+      "capacity": {
+        "memory": {
+          "value": "80Gi"
+        }
+      }
+    },
+    {
+      "driver": "gpu.example.com",
+      "pool": "node-a",
+      "device": "gpu-1",
+      "nodeScope": "node-a",
+      "status": "Tainted",
+      "taints": [
+        {
+          "key": "example.com/maintenance",
+          "effect": "NoSchedule"
+        }
+      ],
+      "attributes": {
+        "index": {
+          "int": 1
+        },
+        "model": {
+          "string": "A100"
+        }
+      },
+      "capacity": {
+        "memory": {
+          "value": "80Gi"
+        }
+      }
+    },
+    {
+      "driver": "gpu.example.com",
+      "pool": "node-a",
+      "device": "gpu-2",
+      "nodeScope": "node-a",
+      "status": "Tainted",
+      "taints": [
+        {
+          "key": "example.com/drain",
+          "effect": "NoExecute",
+          "rule": "drain-gpu-2"
+        }
+      ],
+      "attributes": {
+        "index": {
+          "int": 2
+        },
+        "model": {
+          "string": "L4"
+        }
+      },
+      "capacity": {
+        "memory": {
+          "value": "24Gi"
+        }
+      }
+    },
+    {
+      "driver": "gpu.example.com",
+      "pool": "node-a",
+      "device": "gpu-3",
+      "nodeScope": "node-a",
+      "status": "Free",
+      "claims": [
+        {
+          "namespace": "ops",
+          "name": "monitor",
+          "request": "all",
+          "adminAccess": true
+        }
+      ],
+      "taints": [
+        {
+          "key": "example.com/ecc-warning",
+          "value": "1",
+          "effect": "None"
+        }
+      ],
+      "attributes": {
+        "index": {
+          "int": 3
+        },
+        "model": {
+          "string": "L4"
+        }
+      },
+      "capacity": {
+        "memory": {
+          "value": "24Gi"
+        }
+      }
+    },
+    {
+      "driver": "gpu.example.com",
+      "pool": "node-b",
+      "device": "gpu-0",
+      "nodeScope": "node-b",
+      "status": "Unavailable",
+      "reason": "pool is incomplete (1 of 2 slices)",
+      "attributes": {
+        "index": {
+          "int": 0
+        },
+        "model": {
+          "string": "A100"
+        }
+      },
+      "capacity": {
+        "memory": {
+          "value": "80Gi"
+        }
+      }
+    },
+    {
+      "driver": "net.example.com",
+      "pool": "fabric",
+      "device": "nic-0",
+      "nodeScope": "all nodes",
+      "status": "Shared",
+      "claims": [
+        {
+          "namespace": "team-a",
+          "name": "net-1",
+          "request": "nic",
+          "shareID": "7d2e3f4a-0000-0000-0000-000000000001"
+        },
+        {
+          "namespace": "team-b",
+          "name": "net-2",
+          "request": "nic",
+          "shareID": "7d2e3f4a-0000-0000-0000-000000000002"
+        }
+      ],
+      "attributes": {
+        "speed": {
+          "string": "400G"
+        }
+      },
+      "capacity": {
+        "bandwidth": {
+          "value": "400"
+        }
+      }
+    }
+  ]
+}
