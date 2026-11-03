@@ -223,14 +223,10 @@ func allocationNode(c *analyze.Consumer, alloc *resourceapi.AllocationResult, no
 		return c.Pod.Spec.NodeName, nil
 	}
 	scope := analyze.NodeScope{NodeSelector: alloc.NodeSelector, AllNodes: alloc.NodeSelector == nil}
-	names, err := scope.Nodes(nodes)
-	if err != nil {
+	if _, err := scope.Nodes(nodes); err != nil {
 		return "", err
 	}
-	if len(names) == 1 && !scope.AllNodes {
-		return names[0], nil
-	}
-	return scope.String(), nil
+	return scope.Describe(nodes), nil
 }
 
 // sortMapRows groups rows by namespace and consumer, with claims nothing

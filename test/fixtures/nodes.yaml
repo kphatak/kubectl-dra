@@ -1,0 +1,272 @@
+# Nodes in every state the nodes command reports.
+#
+#   cpu-1      no DRA devices; reaches the 2 network devices; no issues
+#   gpu-1      4 GPUs (1 allocated, 1 tainted, 2 free); no issues
+#   gpu-2      GPU plugin pod crash-looping and no slices: two issues
+#   gpu-3      NotReady with slices: stale data warning
+#   gpu-4      pool declares 2 slices, publishes 1: incomplete pool
+#   gone-node  slices for a node that does not exist
+#
+# Plugin pods: DaemonSet dra-driver/gpu-plugin on gpu-1..4, and a CSI node
+# plugin (storage/csi-node, which mounts plugins/csi.example.com) on every
+# node. The CSI plugin must not be taken for the GPU driver's plugin, so
+# cpu-1 must not be flagged.
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Node
+  metadata: {name: cpu-1}
+  status:
+    conditions: [{type: Ready, status: "True"}]
+- apiVersion: v1
+  kind: Node
+  metadata: {name: gpu-1}
+  status:
+    conditions: [{type: Ready, status: "True"}]
+- apiVersion: v1
+  kind: Node
+  metadata: {name: gpu-2}
+  status:
+    conditions: [{type: Ready, status: "True"}]
+- apiVersion: v1
+  kind: Node
+  metadata: {name: gpu-3}
+  status:
+    conditions: [{type: Ready, status: "False"}]
+- apiVersion: v1
+  kind: Node
+  metadata: {name: gpu-4}
+  status:
+    conditions: [{type: Ready, status: "True"}]
+---
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: gpu-plugin-a
+    namespace: dra-driver
+    ownerReferences: [{apiVersion: apps/v1, kind: DaemonSet, name: gpu-plugin, uid: d5000000-0000-0000-0000-000000000001, controller: true}]
+  spec:
+    nodeName: gpu-1
+    containers: [{name: plugin, image: driver}]
+    volumes:
+    - {name: registry, hostPath: {path: /var/lib/kubelet/plugins_registry}}
+    - {name: plugins, hostPath: {path: /var/lib/kubelet/plugins}}
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "True"}]
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: gpu-plugin-b
+    namespace: dra-driver
+    ownerReferences: [{apiVersion: apps/v1, kind: DaemonSet, name: gpu-plugin, uid: d5000000-0000-0000-0000-000000000001, controller: true}]
+  spec:
+    nodeName: gpu-2
+    containers: [{name: plugin, image: driver}]
+    volumes:
+    - {name: registry, hostPath: {path: /var/lib/kubelet/plugins_registry/}}
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "False"}]
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: gpu-plugin-c
+    namespace: dra-driver
+    ownerReferences: [{apiVersion: apps/v1, kind: DaemonSet, name: gpu-plugin, uid: d5000000-0000-0000-0000-000000000001, controller: true}]
+  spec:
+    nodeName: gpu-3
+    containers: [{name: plugin, image: driver}]
+    volumes:
+    - {name: registry, hostPath: {path: /var/lib/kubelet/plugins_registry}}
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "True"}]
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: gpu-plugin-d
+    namespace: dra-driver
+    ownerReferences: [{apiVersion: apps/v1, kind: DaemonSet, name: gpu-plugin, uid: d5000000-0000-0000-0000-000000000001, controller: true}]
+  spec:
+    nodeName: gpu-4
+    containers: [{name: plugin, image: driver}]
+    volumes:
+    # A kubelet with a non-default root directory.
+    - {name: registry, hostPath: {path: /var/lib/k0s/kubelet/plugins_registry}}
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "True"}]
+---
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: csi-node-1
+    namespace: storage
+    ownerReferences: [{apiVersion: apps/v1, kind: DaemonSet, name: csi-node, uid: c5000000-0000-0000-0000-000000000001, controller: true}]
+  spec:
+    nodeName: cpu-1
+    containers: [{name: csi, image: csi}]
+    volumes:
+    - {name: registry, hostPath: {path: /var/lib/kubelet/plugins_registry}}
+    - {name: socket, hostPath: {path: /var/lib/kubelet/plugins/csi.example.com}}
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "True"}]
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: csi-node-2
+    namespace: storage
+    ownerReferences: [{apiVersion: apps/v1, kind: DaemonSet, name: csi-node, uid: c5000000-0000-0000-0000-000000000001, controller: true}]
+  spec:
+    nodeName: gpu-1
+    containers: [{name: csi, image: csi}]
+    volumes:
+    - {name: registry, hostPath: {path: /var/lib/kubelet/plugins_registry}}
+    - {name: socket, hostPath: {path: /var/lib/kubelet/plugins/csi.example.com}}
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "True"}]
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: csi-node-3
+    namespace: storage
+    ownerReferences: [{apiVersion: apps/v1, kind: DaemonSet, name: csi-node, uid: c5000000-0000-0000-0000-000000000001, controller: true}]
+  spec:
+    nodeName: gpu-2
+    containers: [{name: csi, image: csi}]
+    volumes:
+    - {name: registry, hostPath: {path: /var/lib/kubelet/plugins_registry}}
+    - {name: socket, hostPath: {path: /var/lib/kubelet/plugins/csi.example.com}}
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "True"}]
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: csi-node-4
+    namespace: storage
+    ownerReferences: [{apiVersion: apps/v1, kind: DaemonSet, name: csi-node, uid: c5000000-0000-0000-0000-000000000001, controller: true}]
+  spec:
+    nodeName: gpu-3
+    containers: [{name: csi, image: csi}]
+    volumes:
+    - {name: registry, hostPath: {path: /var/lib/kubelet/plugins_registry}}
+    - {name: socket, hostPath: {path: /var/lib/kubelet/plugins/csi.example.com}}
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "True"}]
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: csi-node-5
+    namespace: storage
+    ownerReferences: [{apiVersion: apps/v1, kind: DaemonSet, name: csi-node, uid: c5000000-0000-0000-0000-000000000001, controller: true}]
+  spec:
+    nodeName: gpu-4
+    containers: [{name: csi, image: csi}]
+    volumes:
+    - {name: registry, hostPath: {path: /var/lib/kubelet/plugins_registry}}
+    - {name: socket, hostPath: {path: /var/lib/kubelet/plugins/csi.example.com}}
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "True"}]
+# Not a plugin: no registry mount.
+- apiVersion: v1
+  kind: Pod
+  metadata: {name: app, namespace: default}
+  spec:
+    nodeName: cpu-1
+    containers: [{name: app, image: app}]
+  status:
+    phase: Running
+    conditions: [{type: Ready, status: "True"}]
+# A finished plugin pod is ignored even though it is not Ready.
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: gpu-plugin-old
+    namespace: dra-driver
+  spec:
+    nodeName: cpu-1
+    containers: [{name: plugin, image: driver}]
+    volumes: [{name: registry, hostPath: {path: /var/lib/kubelet/plugins_registry}}]
+  status:
+    phase: Failed
+---
+apiVersion: v1
+kind: List
+items:
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceSlice
+  metadata: {name: gpu-1-gpus}
+  spec:
+    driver: gpu.example.com
+    nodeName: gpu-1
+    pool: {name: gpu-1, generation: 1, resourceSliceCount: 1}
+    devices:
+    - name: gpu-0
+    - name: gpu-1
+    - name: gpu-2
+    - name: gpu-3
+      taints: [{key: example.com/ecc, effect: NoSchedule}]
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceSlice
+  metadata: {name: gpu-3-gpus}
+  spec:
+    driver: gpu.example.com
+    nodeName: gpu-3
+    pool: {name: gpu-3, generation: 1, resourceSliceCount: 1}
+    devices:
+    - name: gpu-0
+    - name: gpu-1
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceSlice
+  metadata: {name: gpu-4-gpus-part1}
+  spec:
+    driver: gpu.example.com
+    nodeName: gpu-4
+    pool: {name: gpu-4, generation: 1, resourceSliceCount: 2}
+    devices:
+    - name: gpu-0
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceSlice
+  metadata: {name: gone-node-gpus}
+  spec:
+    driver: gpu.example.com
+    nodeName: gone-node
+    pool: {name: gone-node, generation: 1, resourceSliceCount: 1}
+    devices:
+    - name: gpu-0
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceSlice
+  metadata: {name: fabric}
+  spec:
+    driver: net.example.com
+    allNodes: true
+    pool: {name: fabric, generation: 1, resourceSliceCount: 1}
+    devices:
+    - name: nic-0
+    - name: nic-1
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: train, namespace: team-a}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly: {deviceClassName: gpu.example.com}
+  status:
+    allocation:
+      devices:
+        results:
+        - {request: gpu, driver: gpu.example.com, pool: gpu-1, device: gpu-0}

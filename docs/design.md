@@ -148,6 +148,71 @@ per-device CEL evaluation in the `why` funnel.
   allocation's node selector points (one node, "all nodes", or the
   selector).
 
+## Node issues
+
+- `nodes` counts only devices local to a node (slice-level `nodeName`, or a
+  device's own with per-device node selection). Network-attached devices
+  are counted separately as reachable, so totals are not inflated by every
+  `allNodes` pool.
+- Kubelet plugin pods are found by a hostPath volume whose base name is
+  `plugins_registry`, which also matches kubelets with a non-default root
+  directory. CSI node plugins match too, and must be told apart.
+- Matching plugins to drivers: the API has no link. dra-example-driver
+  mounts the whole `<kubelet>/plugins` directory, so mounts alone do not
+  name its driver. Rules, in order:
+  1. A group (pods sharing a controller, usually a DaemonSet) mounting
+     `<kubelet>/plugins/<D>` for a DRA driver D is D's plugin.
+  2. Otherwise infer: candidates mount no `plugins/<X>` of a non-DRA driver
+     X (this excludes standard CSI node plugins) and run on every existing
+     node D publishes for; the candidates on the fewest nodes win.
+  3. Flag a node only if every winner runs there and D publishes nothing
+     for it, so ties cannot produce false alarms.
+  A mutation test showed rule 2's CSI exclusion is what keeps CPU nodes in a
+  cluster with a CSI plugin everywhere from being flagged. Drivers that
+  publish nothing anywhere cannot be matched and are not covered.
+- NotReady is reported only when the Ready condition exists and is not
+  True (False or Unknown), and only for nodes with slices.
+
+## Why
+
+- **The allocator is the authority.** `analyze.CheckWithAllocator` runs
+  `structured.NewAllocator(...).Allocate` for the claim on every candidate
+  node, with allocated state from all other claims and slices with
+  DeviceTaintRules applied (as `resourceslice/tracker` does for the
+  scheduler). The verdict follows it; the funnel explains it. If the funnel
+  says no and the allocator yes, the output says so and asks for a bug
+  report.
+- **Fatal errors are per node.** `Allocate` returns a fatal error, not
+  "no", for some node-specific inputs, such as `allocationMode: All` next to
+  an incomplete pool. We record those as aborting nodes and keep going: the
+  scheduler aborts its cycle only if it evaluates such a node, so success on
+  another node is still reported. Only an error on every node is ERROR.
+- **Funnel stages**: published, in usable pools, class
+  selectors, request selectors, not allocated (skipped for admin access),
+  taints tolerated, reachable from candidate nodes, then a per-node count.
+  The allocator checks "in use" before selectors; we put selectors first
+  because "matches but busy" explains more. Counting is per node, because
+  all devices of a request must be reachable from one node.
+- **allocationMode All** mirrors the allocator: at least one device, every
+  matching device on the node must be allocatable, and any unusable pool
+  the node can see makes the node fail.
+- **Missing class:** the allocator reports it as a fatal error; we report
+  the funnel's NOT ALLOCATABLE with the class name, which is the actual
+  answer.
+- **CEL explanations** show the first false selector and the device's values
+  for the fields that expression reads (`celx.Values`, a textual scan of
+  `device.attributes[...]` and `device.capacity[...]`).
+- **Candidate nodes** for a pod: bound node, else required node affinity,
+  NoSchedule and NoExecute taints, and cordons, through component-helpers.
+  Not CPU, memory, ports, pod affinity or topology spread. For a claim
+  without a pod: all nodes.
+- **Features** are inferred from the data (`analyze.InferFeatures`): a
+  feature is on if any object uses fields only it handles. Shown in the
+  output, since a cluster with a gate off may decide differently.
+- **Defaults:** objects from files get the API server's request defaults
+  (allocationMode ExactCount, count 1, toleration operator Equal), because
+  the allocator rejects a request without an allocationMode.
+
 ## E2E
 
 - `make e2e` runs `test/e2e/run.sh`: kind (pinned in the Makefile, built into
@@ -205,14 +270,18 @@ In order. Check items off here as they land.
    device, or per consumer and request while pending. Statuses Allocated,
    Pending, Missing (pod names a claim that does not exist) and NotCreated
    (template claim not generated yet). See "Claim linkage" below.
-7. **`kubectl dra nodes`.** Per-node totals, plus the "should publish but does
-   not" heuristic (driver DaemonSet pod present, no slices).
-8. **`kubectl dra why`.** The planned funnel, then allocator
-   confirmation. Prerequisites: apply DeviceTaintRules to slices ourselves
-   (the scheduler does this in `resourceslice/tracker`), infer
-   `structured.Features` from fields present in the snapshot, and handle
-   `distinctAttribute` alongside `matchAttribute`. Cover every scenario in the
-   planned unit test list with fixtures.
+7. ~~**`kubectl dra nodes`.**~~ Done; see "Node issues" below. Not done:
+   a "node labels a DeviceClass expects" heuristic, since
+   there is no reliable way to tie a DeviceClass to node labels.
+8. **`kubectl dra why`.** First version done; see "Why" below. Remaining:
+   - Decompose constraint failures: when every request fits alone but the
+     allocator rejects all nodes, show which `matchAttribute` or
+     `distinctAttribute` values conflict instead of "not decomposed".
+   - `why pod/X` with several claims: the scheduler allocates them
+     together; we explain and confirm each claim alone.
+   - Consumable capacity: a shared device with spare capacity is kept in
+     the funnel without checking the capacity; the allocator decides.
+   - Feature inference from the server version as well as from the data.
 9. **Release.** LICENSE (Apache-2.0), CONTRIBUTING, CODE_OF_CONDUCT,
    SECURITY, issue templates, goreleaser, `.krew.yaml`, README with demo and
    RBAC, then krew-index submission after testing on a real GPU cluster.

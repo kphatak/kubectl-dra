@@ -65,6 +65,20 @@ spec:
   - name: gpus
     resourceClaimName: two-gpus
 ---
+# Satisfiable but unused: no pod references it, so the scheduler never
+# allocates it, and "why" must report it as allocatable.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: unused
+  namespace: dra-e2e
+spec:
+  devices:
+    requests:
+    - name: gpu
+      exactly:
+        deviceClassName: gpu.example.com
+---
 # Bad: the DeviceClass does not exist.
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaim

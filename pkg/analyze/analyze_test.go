@@ -1,11 +1,15 @@
 package analyze
 
 import (
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/utils/ptr"
 
 	"github.com/kphatak/kubectl-dra/pkg/snapshot"
 )
@@ -295,6 +299,137 @@ func TestMapClaimsOwnerAndStaleReservation(t *testing.T) {
 			t.Errorf("prio consumers: got %+v, want the new pod unreserved and the stale reservation apart", use.Consumers)
 		}
 	}
+}
+
+func TestNodes(t *testing.T) {
+	s := load(t, "nodes.yaml")
+	pools := Pools(s.ResourceSlices)
+	devices := Devices(pools, BuildAllocations(s.ResourceClaims, true), s.DeviceTaintRules)
+	summaries, err := Nodes(s.Nodes, s.Pods, pools, devices)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type want struct {
+		exists                             bool
+		devices, allocated, free, tainted  int
+		unavailable, reachable, pluginPods int
+		issues                             []string
+	}
+	wants := []struct {
+		name string
+		want
+	}{
+		{"cpu-1", want{exists: true, reachable: 2, pluginPods: 1}},
+		{"gpu-1", want{exists: true, devices: 4, allocated: 1, free: 2, tainted: 1, reachable: 2, pluginPods: 2}},
+		{"gpu-2", want{exists: true, reachable: 2, pluginPods: 2, issues: []string{
+			"kubelet plugin pod dra-driver/gpu-plugin-b is not Ready",
+			"DaemonSet dra-driver/gpu-plugin (dra-driver/gpu-plugin-b) seems to be the kubelet plugin for gpu.example.com, but no gpu.example.com ResourceSlice names this node",
+		}}},
+		{"gpu-3", want{exists: true, devices: 2, free: 2, reachable: 2, pluginPods: 2, issues: []string{
+			"node is NotReady; its ResourceSlices may be stale",
+		}}},
+		{"gpu-4", want{exists: true, devices: 1, unavailable: 1, reachable: 2, pluginPods: 2, issues: []string{
+			"pool gpu.example.com/gpu-4 is Incomplete (1 of 2 slices)",
+		}}},
+		{"gone-node", want{devices: 1, free: 1, issues: []string{
+			"node does not exist; its ResourceSlices are left over",
+		}}},
+	}
+	if len(summaries) != len(wants) {
+		var names []string
+		for _, s := range summaries {
+			names = append(names, s.Name)
+		}
+		t.Fatalf("got nodes %v, want %d", names, len(wants))
+	}
+	for i, w := range wants {
+		got := summaries[i]
+		if got.Name != w.name {
+			t.Errorf("node %d: got %s, want %s", i, got.Name, w.name)
+			continue
+		}
+		g := want{
+			exists: got.Node != nil, devices: got.Devices, allocated: got.Allocated, free: got.Free, tainted: got.Tainted,
+			unavailable: got.Unavailable, reachable: got.Reachable, pluginPods: len(got.PluginPods), issues: got.Issues,
+		}
+		if !reflect.DeepEqual(g, w.want) {
+			t.Errorf("%s:\n got %+v\nwant %+v", w.name, g, w.want)
+		}
+	}
+}
+
+// nodeIssues runs Nodes and returns the issues per node name.
+func nodeIssues(t *testing.T, s *snapshot.Snapshot) map[string][]string {
+	t.Helper()
+	pools := Pools(s.ResourceSlices)
+	devices := Devices(pools, BuildAllocations(s.ResourceClaims, true), s.DeviceTaintRules)
+	summaries, err := Nodes(s.Nodes, s.Pods, pools, devices)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issues := make(map[string][]string)
+	for _, sum := range summaries {
+		issues[sum.Name] = sum.Issues
+	}
+	return issues
+}
+
+func TestNodesPluginMatching(t *testing.T) {
+	t.Run("CSI plugin alone is never taken for a DRA driver", func(t *testing.T) {
+		s := load(t, "nodes.yaml")
+		s.Pods = slices.DeleteFunc(s.Pods, func(p *corev1.Pod) bool { return strings.HasPrefix(p.Name, "gpu-plugin-") })
+		for node, issues := range nodeIssues(t, s) {
+			for _, issue := range issues {
+				if strings.Contains(issue, "kubelet plugin") {
+					t.Errorf("%s: unexpected plugin issue %q", node, issue)
+				}
+			}
+		}
+	})
+
+	t.Run("a mounted plugins/<driver> directory names the driver directly", func(t *testing.T) {
+		s := load(t, "nodes.yaml")
+		for _, p := range s.Pods {
+			if strings.HasPrefix(p.Name, "gpu-plugin-") {
+				p.Spec.Volumes = append(p.Spec.Volumes, corev1.Volume{
+					Name:         "data",
+					VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/var/lib/kubelet/plugins/gpu.example.com"}},
+				})
+			}
+		}
+		want := "DaemonSet dra-driver/gpu-plugin (dra-driver/gpu-plugin-b) is the kubelet plugin for gpu.example.com, but no gpu.example.com ResourceSlice names this node"
+		if got := nodeIssues(t, s)["gpu-2"]; !slices.Contains(got, want) {
+			t.Errorf("gpu-2 issues: got %q, want one of them to be %q", got, want)
+		}
+	})
+
+	t.Run("a tie between candidates only flags nodes both run on", func(t *testing.T) {
+		s := load(t, "nodes.yaml")
+		// A second plugin DaemonSet on gpu-1, gpu-3, gpu-4 and cpu-1 ties
+		// with gpu-plugin (four nodes each). They share no node without
+		// slices, so nothing may be flagged.
+		for _, node := range []string{"gpu-1", "gpu-3", "gpu-4", "cpu-1"} {
+			s.Pods = append(s.Pods, &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "other-" + node, Namespace: "other",
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "apps/v1", Kind: "DaemonSet", Name: "other", UID: "o1", Controller: ptr.To(true)}},
+				},
+				Spec: corev1.PodSpec{NodeName: node, Volumes: []corev1.Volume{{
+					Name:         "registry",
+					VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/var/lib/kubelet/plugins_registry"}},
+				}}},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}},
+			})
+		}
+		for node, issues := range nodeIssues(t, s) {
+			for _, issue := range issues {
+				if strings.Contains(issue, "ResourceSlice names this node") {
+					t.Errorf("%s: unexpected issue %q", node, issue)
+				}
+			}
+		}
+	})
 }
 
 func TestNodeScope(t *testing.T) {

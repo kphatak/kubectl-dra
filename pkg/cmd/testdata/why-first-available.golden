@@ -1,0 +1,43 @@
+Claim why/first-available
+ALLOCATABLE: the allocator finds devices on 1 of 3 candidate nodes (node-b)
+
+Request "gpu", alternative 1 of 2: exactly 1 from class a100 (not satisfiable)
+  published                       8
+  in usable pools                 7
+                                  -1   pool gpu.example.com/node-c is incomplete (1 of 2 slices)
+                                         e.g. gpu.example.com/node-c/gpu-0
+  match the class                 5
+                                  -2   class selector #1 is false: device.attributes['gpu.example.com'].model == 'A100'
+                                         e.g. gpu.example.com/node-b/gpu-0 (gpu.example.com/model="L4")
+                                         e.g. gpu.example.com/node-b/gpu-1 (gpu.example.com/model="L4")
+  match the request selectors     5
+  not allocated to other claims   0
+                                  -5   allocated to another claim
+                                         e.g. gpu.example.com/node-a/gpu-0 (other/holder)
+                                         e.g. gpu.example.com/node-a/gpu-1 (other/holder)
+                                         e.g. gpu.example.com/node-a/gpu-2 (other/holder)
+  request "gpu/large" needs 1 device: 8 published, 7 in usable pools, 5 match the class, 5 match the request selectors, 0 not allocated to other claims
+
+Request "gpu", alternative 2 of 2: exactly 1 from class gpu (satisfiable on 1 node(s))
+  published                        8
+  in usable pools                  7
+                                   -1   pool gpu.example.com/node-c is incomplete (1 of 2 slices)
+                                          e.g. gpu.example.com/node-c/gpu-0
+  match the class                  7
+  match the request selectors      2
+                                   -5   selector #0 is false: device.attributes['gpu.example.com'].model == 'L4'
+                                          e.g. gpu.example.com/node-a/gpu-0 (gpu.example.com/model="A100")
+                                          e.g. gpu.example.com/node-a/gpu-1 (gpu.example.com/model="A100")
+                                          e.g. gpu.example.com/node-a/gpu-2 (gpu.example.com/model="A100")
+  not allocated to other claims    2
+  taints tolerated                 2
+  reachable from candidate nodes   2
+  needs 1 on one node; best node node-b has 2
+
+Pool warnings:
+  - pool gpu.example.com/node-c has devices this claim could use but is incomplete (1 of 2 slices); the scheduler does not allocate from it
+
+Allocator: allocation possible on 1 of 3 candidate nodes (features assumed: DRAPrioritizedList)
+
+Hints:
+  - Incomplete pools usually mean a driver is republishing or failing. Check: kubectl dra pools and kubectl dra nodes --issues

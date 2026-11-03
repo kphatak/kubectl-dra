@@ -19,6 +19,27 @@ func selectors(exprs ...string) []resourceapi.DeviceSelector {
 	return out
 }
 
+func TestValues(t *testing.T) {
+	device := &resourceapi.Device{
+		Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+			"model":                {StringValue: ptr.To("A100")},
+			"example.com/firmware": {VersionValue: ptr.To("1.2.3")},
+		},
+		Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+			"memory": {Value: resource.MustParse("80Gi")},
+		},
+	}
+	expr := `device.attributes["gpu.example.com"].model == "H100" &&
+		device.capacity['gpu.example.com'].memory.compareTo(quantity("40Gi")) >= 0 &&
+		device.attributes["example.com"]["firmware"].isGreaterThan(semver("2.0.0")) &&
+		device.attributes["gpu.example.com"].model != "" &&
+		device.attributes["gpu.example.com"].nvlink`
+	want := `gpu.example.com/model="A100", gpu.example.com/memory=80Gi, example.com/firmware=version 1.2.3, gpu.example.com/nvlink=<missing>`
+	if got := Values(expr, "gpu.example.com", device); got != want {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
+}
+
 func TestMatch(t *testing.T) {
 	device := &resourceapi.Device{
 		Name: "gpu-0",

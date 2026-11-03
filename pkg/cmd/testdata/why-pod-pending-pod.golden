@@ -1,0 +1,15 @@
+Claim why/bound, for pod why/pending-pod
+ALLOCATED, POD PENDING: the claim's devices are usable only on node-a, and the pod cannot run there
+
+Allocated devices:
+  gpu: gpu.example.com/node-a/gpu-4
+
+Scheduler:
+  PodScheduled: 0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 1 node(s) had untolerated taint {dedicated: infra}, 1 node(s) cannot allocate all claims.
+  FailedScheduling: 0/3 nodes are available: 1 node(s) cannot allocate all claims.
+
+Nodes where the claim's devices are usable: 1; the pod can run on 0
+  -1 does not match the pod's nodeSelector or node affinity: node-a
+
+Hints:
+  - The pod's nodeSelector, affinity or tolerations exclude the nodes where the claim's devices are; fix the pod, or delete the claim so it is allocated again

@@ -1,0 +1,313 @@
+# One cluster, one claim per "why" scenario.
+#
+# Nodes: node-a (zone a), node-b (zone b), node-c (zone c, tainted
+# dedicated=infra:NoSchedule).
+# Devices (driver gpu.example.com):
+#   node-a pool: gpu-0..gpu-4, A100 80Gi. gpu-0..3 held by claim holder,
+#                gpu-4 by claim bound. All busy.
+#   node-b pool: gpu-0, gpu-1, L4 24Gi, index 0 and 1. Free.
+#   node-c pool: declares 2 slices, publishes 1 with gpu-0, A100. Incomplete.
+#
+# Claims in namespace why, by scenario:
+#   unknown-class   DeviceClass does not exist
+#   class-false     class h100 selects nothing (CEL false on class)
+#   request-false   selector wants 100Gi (CEL false on request)
+#   cel-error       class bad-cel does not compile
+#   all-busy        class a100; every A100 is allocated; node-c pool incomplete
+#   match-conflict  two requests with matchAttribute on index: each fits, together not
+#   first-available "large" (a100) is busy, falls through to "small" (L4)
+#   all-l4          allocationMode All on L4: allocatable on node-b
+#   too-many        3 L4s on one node; node-b has 2
+#   wrong-zone      pod wrong-zone may only run in zone a; the L4s are in zone b
+#   bound           allocated on node-a; pod pending-pod wants zone b
+#   pod templated   claim from a template, pending, satisfiable
+#   pod not-yet     template claim not created yet
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Node
+  metadata: {name: node-a, labels: {zone: a}}
+  status: {conditions: [{type: Ready, status: "True"}]}
+- apiVersion: v1
+  kind: Node
+  metadata: {name: node-b, labels: {zone: b}}
+  status: {conditions: [{type: Ready, status: "True"}]}
+- apiVersion: v1
+  kind: Node
+  metadata: {name: node-c, labels: {zone: c}}
+  spec:
+    taints: [{key: dedicated, value: infra, effect: NoSchedule}]
+  status: {conditions: [{type: Ready, status: "True"}]}
+- apiVersion: resource.k8s.io/v1
+  kind: DeviceClass
+  metadata: {name: gpu}
+  spec:
+    selectors: [{cel: {expression: "device.driver == 'gpu.example.com'"}}]
+- apiVersion: resource.k8s.io/v1
+  kind: DeviceClass
+  metadata: {name: a100}
+  spec:
+    selectors:
+    - cel: {expression: "device.driver == 'gpu.example.com'"}
+    - cel: {expression: "device.attributes['gpu.example.com'].model == 'A100'"}
+- apiVersion: resource.k8s.io/v1
+  kind: DeviceClass
+  metadata: {name: h100}
+  spec:
+    selectors:
+    - cel: {expression: "device.attributes['gpu.example.com'].model == 'H100'"}
+- apiVersion: resource.k8s.io/v1
+  kind: DeviceClass
+  metadata: {name: bad-cel}
+  spec:
+    selectors: [{cel: {expression: "device.driver =="}}]
+---
+apiVersion: v1
+kind: List
+items:
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceSlice
+  metadata: {name: node-a-gpus}
+  spec:
+    driver: gpu.example.com
+    nodeName: node-a
+    pool: {name: node-a, generation: 1, resourceSliceCount: 1}
+    devices:
+    - {name: gpu-0, attributes: {model: {string: A100}, index: {int: 0}}, capacity: {memory: {value: 80Gi}}}
+    - {name: gpu-1, attributes: {model: {string: A100}, index: {int: 1}}, capacity: {memory: {value: 80Gi}}}
+    - {name: gpu-2, attributes: {model: {string: A100}, index: {int: 2}}, capacity: {memory: {value: 80Gi}}}
+    - {name: gpu-3, attributes: {model: {string: A100}, index: {int: 3}}, capacity: {memory: {value: 80Gi}}}
+    - {name: gpu-4, attributes: {model: {string: A100}, index: {int: 4}}, capacity: {memory: {value: 80Gi}}}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceSlice
+  metadata: {name: node-b-gpus}
+  spec:
+    driver: gpu.example.com
+    nodeName: node-b
+    pool: {name: node-b, generation: 1, resourceSliceCount: 1}
+    devices:
+    - {name: gpu-0, attributes: {model: {string: L4}, index: {int: 0}}, capacity: {memory: {value: 24Gi}}}
+    - {name: gpu-1, attributes: {model: {string: L4}, index: {int: 1}}, capacity: {memory: {value: 24Gi}}}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceSlice
+  metadata: {name: node-c-gpus-part1}
+  spec:
+    driver: gpu.example.com
+    nodeName: node-c
+    pool: {name: node-c, generation: 1, resourceSliceCount: 2}
+    devices:
+    - {name: gpu-0, attributes: {model: {string: A100}, index: {int: 0}}, capacity: {memory: {value: 80Gi}}}
+---
+apiVersion: v1
+kind: List
+items:
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: holder, namespace: other}
+  spec:
+    devices:
+      requests:
+      - name: gpus
+        exactly: {deviceClassName: a100, count: 4}
+  status:
+    allocation:
+      devices:
+        results:
+        - {request: gpus, driver: gpu.example.com, pool: node-a, device: gpu-0}
+        - {request: gpus, driver: gpu.example.com, pool: node-a, device: gpu-1}
+        - {request: gpus, driver: gpu.example.com, pool: node-a, device: gpu-2}
+        - {request: gpus, driver: gpu.example.com, pool: node-a, device: gpu-3}
+      nodeSelector:
+        nodeSelectorTerms: [{matchFields: [{key: metadata.name, operator: In, values: [node-a]}]}]
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: bound, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly: {deviceClassName: a100}
+  status:
+    allocation:
+      devices:
+        results:
+        - {request: gpu, driver: gpu.example.com, pool: node-a, device: gpu-4}
+      nodeSelector:
+        nodeSelectorTerms: [{matchFields: [{key: metadata.name, operator: In, values: [node-a]}]}]
+    reservedFor:
+    - {resource: pods, name: pending-pod, uid: 00000000-0000-0000-0000-0000000000b1}
+- apiVersion: v1
+  kind: Pod
+  metadata: {name: pending-pod, namespace: why, uid: 00000000-0000-0000-0000-0000000000b1}
+  spec:
+    nodeSelector: {zone: b}
+    containers: [{name: c, image: pause}]
+    resourceClaims: [{name: gpu, resourceClaimName: bound}]
+  status:
+    phase: Pending
+    conditions:
+    - type: PodScheduled
+      status: "False"
+      reason: Unschedulable
+      message: "0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 1 node(s) had untolerated taint {dedicated: infra}, 1 node(s) cannot allocate all claims."
+- apiVersion: v1
+  kind: Event
+  metadata: {name: pending-pod.1, namespace: why}
+  involvedObject: {kind: Pod, namespace: why, name: pending-pod}
+  type: Warning
+  reason: FailedScheduling
+  message: "0/3 nodes are available: 1 node(s) cannot allocate all claims."
+  lastTimestamp: "2026-11-02T10:00:00Z"
+---
+apiVersion: v1
+kind: List
+items:
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: unknown-class, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly: {deviceClassName: missing}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: class-false, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly: {deviceClassName: h100}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: request-false, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu
+          selectors:
+          - cel: {expression: "device.capacity['gpu.example.com'].memory.compareTo(quantity('100Gi')) >= 0"}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: cel-error, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly: {deviceClassName: bad-cel}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: all-busy, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly: {deviceClassName: a100}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: match-conflict, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: a
+        exactly: {deviceClassName: gpu, selectors: [{cel: {expression: "device.attributes['gpu.example.com'].model == 'L4'"}}]}
+      - name: b
+        exactly: {deviceClassName: gpu, selectors: [{cel: {expression: "device.attributes['gpu.example.com'].model == 'L4'"}}]}
+      constraints:
+      - requests: [a, b]
+        matchAttribute: gpu.example.com/index
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: first-available, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        firstAvailable:
+        - {name: large, deviceClassName: a100}
+        - name: small
+          deviceClassName: gpu
+          selectors: [{cel: {expression: "device.attributes['gpu.example.com'].model == 'L4'"}}]
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: all-l4, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpus
+        exactly:
+          deviceClassName: gpu
+          allocationMode: All
+          selectors: [{cel: {expression: "device.attributes['gpu.example.com'].model == 'L4'"}}]
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: too-many, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpus
+        exactly:
+          deviceClassName: gpu
+          count: 3
+          selectors: [{cel: {expression: "device.attributes['gpu.example.com'].model == 'L4'"}}]
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: wrong-zone, namespace: why}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu
+          selectors: [{cel: {expression: "device.attributes['gpu.example.com'].model == 'L4'"}}]
+- apiVersion: v1
+  kind: Pod
+  metadata: {name: wrong-zone, namespace: why, uid: 00000000-0000-0000-0000-0000000000c1}
+  spec:
+    nodeSelector: {zone: a}
+    containers: [{name: c, image: pause}]
+    resourceClaims: [{name: gpu, resourceClaimName: wrong-zone}]
+  status: {phase: Pending}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaimTemplate
+  metadata: {name: l4, namespace: why}
+  spec:
+    spec:
+      devices:
+        requests:
+        - name: gpu
+          exactly:
+            deviceClassName: gpu
+            selectors: [{cel: {expression: "device.attributes['gpu.example.com'].model == 'L4'"}}]
+- apiVersion: v1
+  kind: Pod
+  metadata: {name: templated, namespace: why, uid: 00000000-0000-0000-0000-0000000000d1}
+  spec:
+    containers: [{name: c, image: pause}]
+    resourceClaims: [{name: gpu, resourceClaimTemplateName: l4}]
+  status:
+    phase: Pending
+    resourceClaimStatuses: [{name: gpu, resourceClaimName: templated-gpu-x9}]
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata:
+    name: templated-gpu-x9
+    namespace: why
+    ownerReferences: [{apiVersion: v1, kind: Pod, name: templated, uid: 00000000-0000-0000-0000-0000000000d1, controller: true}]
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu
+          selectors: [{cel: {expression: "device.attributes['gpu.example.com'].model == 'L4'"}}]
+- apiVersion: v1
+  kind: Pod
+  metadata: {name: not-yet, namespace: why, uid: 00000000-0000-0000-0000-0000000000e1}
+  spec:
+    containers: [{name: c, image: pause}]
+    resourceClaims: [{name: gpu, resourceClaimTemplateName: l4}]
+  status: {phase: Pending}

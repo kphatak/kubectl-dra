@@ -39,7 +39,8 @@ type Snapshot struct {
 }
 
 // Add appends a typed object to the matching slice. It returns false for
-// kinds that kubectl-dra does not use.
+// kinds that kubectl-dra does not use. Claims and claim templates get the
+// API server's defaults, so file-based objects behave like live ones.
 func (s *Snapshot) Add(obj runtime.Object) bool {
 	switch o := obj.(type) {
 	case *corev1.Node:
@@ -53,8 +54,10 @@ func (s *Snapshot) Add(obj runtime.Object) bool {
 	case *resourceapi.ResourceSlice:
 		s.ResourceSlices = append(s.ResourceSlices, o)
 	case *resourceapi.ResourceClaim:
+		setClaimDefaults(&o.Spec)
 		s.ResourceClaims = append(s.ResourceClaims, o)
 	case *resourceapi.ResourceClaimTemplate:
+		setClaimDefaults(&o.Spec.Spec)
 		s.ResourceClaimTemplates = append(s.ResourceClaimTemplates, o)
 	case *resourceapi.DeviceTaintRule:
 		s.DeviceTaintRules = append(s.DeviceTaintRules, o)

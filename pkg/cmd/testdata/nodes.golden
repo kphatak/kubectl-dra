@@ -1,0 +1,7 @@
+NODE        DRIVERS           DEVICES   ALLOCATED   FREE   ISSUES
+cpu-1       <none>            0         0           0      <none>
+gpu-1       gpu.example.com   4         1           2      <none>
+gpu-2       <none>            0         0           0      kubelet plugin pod dra-driver/gpu-plugin-b is not Ready; DaemonSet dra-driver/gpu-plugin (dra-driver/gpu-plugin-b) seems to be the kubelet plugin for gpu.example.com, but no gpu.example.com ResourceSlice names this node
+gpu-3       gpu.example.com   2         0           2      node is NotReady; its ResourceSlices may be stale
+gpu-4       gpu.example.com   1         0           0      pool gpu.example.com/gpu-4 is Incomplete (1 of 2 slices)
+gone-node   gpu.example.com   1         0           1      node does not exist; its ResourceSlices are left over

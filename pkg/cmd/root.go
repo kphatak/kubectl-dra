@@ -69,8 +69,10 @@ It is read-only and runs entirely from your kubeconfig.`,
 	cmd.AddCommand(
 		newCmdDevices(o),
 		newCmdMap(o),
+		newCmdNodes(o),
 		newCmdPools(o),
 		newCmdVersion(o),
+		newCmdWhy(o),
 		newCmdDump(o),
 	)
 	return cmd

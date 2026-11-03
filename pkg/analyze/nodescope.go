@@ -62,6 +62,17 @@ func (s NodeScope) Nodes(nodes []*corev1.Node) ([]string, error) {
 	return names, nil
 }
 
+// Describe is String, except that a node selector matching exactly one of
+// the given nodes shows as that node's name.
+func (s NodeScope) Describe(nodes []*corev1.Node) string {
+	if s.NodeSelector != nil && !s.AllNodes && s.NodeName == "" {
+		if names, err := s.Nodes(nodes); err == nil && len(names) == 1 {
+			return names[0]
+		}
+	}
+	return s.String()
+}
+
 // String renders the scope for tables: a node name, "all nodes", or the
 // selector with terms joined by " || " and requirements by " && ".
 func (s NodeScope) String() string {

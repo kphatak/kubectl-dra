@@ -44,16 +44,19 @@ func TaintsOf(ref DeviceRef, rules []*resourceapi.DeviceTaintRule) []DeviceTaint
 		taints = append(taints, DeviceTaint{DeviceTaint: t})
 	}
 	for _, r := range rules {
-		sel := r.Spec.DeviceSelector
-		if sel == nil ||
-			(sel.Driver != nil && *sel.Driver != ref.Slice.Spec.Driver) ||
-			(sel.Pool != nil && *sel.Pool != ref.Slice.Spec.Pool.Name) ||
-			(sel.Device != nil && *sel.Device != ref.Device.Name) {
-			continue
+		if ruleMatches(r, ref.Slice, ref.Device) {
+			taints = append(taints, DeviceTaint{DeviceTaint: r.Spec.Taint, Rule: r.Name})
 		}
-		taints = append(taints, DeviceTaint{DeviceTaint: r.Spec.Taint, Rule: r.Name})
 	}
 	return taints
+}
+
+func ruleMatches(r *resourceapi.DeviceTaintRule, slice *resourceapi.ResourceSlice, device *resourceapi.Device) bool {
+	sel := r.Spec.DeviceSelector
+	return sel != nil &&
+		(sel.Driver == nil || *sel.Driver == slice.Spec.Driver) &&
+		(sel.Pool == nil || *sel.Pool == slice.Spec.Pool.Name) &&
+		(sel.Device == nil || *sel.Device == device.Name)
 }
 
 // DeviceStatus summarizes whether a device can be allocated now.

@@ -1,0 +1,78 @@
+{
+  "nodes": [
+    {
+      "node": "gpu-2",
+      "exists": true,
+      "devices": 0,
+      "allocated": 0,
+      "free": 0,
+      "tainted": 0,
+      "unavailable": 0,
+      "reachable": 2,
+      "pluginPods": [
+        "dra-driver/gpu-plugin-b",
+        "storage/csi-node-3"
+      ],
+      "issues": [
+        "kubelet plugin pod dra-driver/gpu-plugin-b is not Ready",
+        "DaemonSet dra-driver/gpu-plugin (dra-driver/gpu-plugin-b) seems to be the kubelet plugin for gpu.example.com, but no gpu.example.com ResourceSlice names this node"
+      ]
+    },
+    {
+      "node": "gpu-3",
+      "exists": true,
+      "drivers": [
+        "gpu.example.com"
+      ],
+      "devices": 2,
+      "allocated": 0,
+      "free": 2,
+      "tainted": 0,
+      "unavailable": 0,
+      "reachable": 2,
+      "pluginPods": [
+        "dra-driver/gpu-plugin-c",
+        "storage/csi-node-4"
+      ],
+      "issues": [
+        "node is NotReady; its ResourceSlices may be stale"
+      ]
+    },
+    {
+      "node": "gpu-4",
+      "exists": true,
+      "drivers": [
+        "gpu.example.com"
+      ],
+      "devices": 1,
+      "allocated": 0,
+      "free": 0,
+      "tainted": 0,
+      "unavailable": 1,
+      "reachable": 2,
+      "pluginPods": [
+        "dra-driver/gpu-plugin-d",
+        "storage/csi-node-5"
+      ],
+      "issues": [
+        "pool gpu.example.com/gpu-4 is Incomplete (1 of 2 slices)"
+      ]
+    },
+    {
+      "node": "gone-node",
+      "exists": false,
+      "drivers": [
+        "gpu.example.com"
+      ],
+      "devices": 1,
+      "allocated": 0,
+      "free": 1,
+      "tainted": 0,
+      "unavailable": 0,
+      "reachable": 0,
+      "issues": [
+        "node does not exist; its ResourceSlices are left over"
+      ]
+    }
+  ]
+}

@@ -144,8 +144,8 @@ func TestDump(t *testing.T) {
 			e2eClaims++
 		}
 	}
-	if e2eClaims != 4 {
-		t.Errorf("claims in %s: got %d, want 4 (one generated from a template)", e2eNamespace, e2eClaims)
+	if e2eClaims != 5 {
+		t.Errorf("claims in %s: got %d, want 5 (one generated from a template)", e2eNamespace, e2eClaims)
 	}
 }
 
@@ -186,6 +186,61 @@ func TestPools(t *testing.T) {
 	}
 }
 
+func TestNodes(t *testing.T) {
+	s := cluster(t)
+	type nodeRow struct {
+		Node       string   `json:"node"`
+		Drivers    []string `json:"drivers"`
+		Devices    int      `json:"devices"`
+		Allocated  int      `json:"allocated"`
+		Reachable  int      `json:"reachable"`
+		PluginPods []string `json:"pluginPods"`
+		Issues     []string `json:"issues"`
+	}
+	rows := decode[struct{ Nodes []nodeRow }](t, kubectlDRA(t, "nodes", "-o", "json")).Nodes
+
+	isWorker := make(map[string]bool)
+	for _, w := range workers(s) {
+		isWorker[w] = true
+	}
+	if len(rows) != len(s.Nodes) {
+		t.Errorf("rows: got %d, want one per node (%d)", len(rows), len(s.Nodes))
+	}
+	allocated := 0
+	for _, r := range rows {
+		// A healthy cluster has no issues. The hand-made incomplete pool
+		// is not local to any node, so it does not show here.
+		if len(r.Issues) > 0 {
+			t.Errorf("%s: unexpected issues %q", r.Node, r.Issues)
+		}
+		// The two fake.example.com devices are allNodes, so reachable
+		// from every node.
+		if r.Reachable != 2 {
+			t.Errorf("%s: reachable devices: got %d, want 2", r.Node, r.Reachable)
+		}
+		if !isWorker[r.Node] {
+			if len(r.Drivers) != 0 || r.Devices != 0 {
+				t.Errorf("control plane %s: got drivers %v and %d devices, want none", r.Node, r.Drivers, r.Devices)
+			}
+			continue
+		}
+		allocated += r.Allocated
+		if len(r.Drivers) != 1 || r.Drivers[0] != gpuDriver || r.Devices != gpusPerWorker {
+			t.Errorf("worker %s: got drivers %v with %d devices, want [%s] with %d", r.Node, r.Drivers, r.Devices, gpuDriver, gpusPerWorker)
+		}
+		var driverPod bool
+		for _, p := range r.PluginPods {
+			driverPod = driverPod || strings.HasPrefix(p, "dra-example-driver/")
+		}
+		if !driverPod {
+			t.Errorf("worker %s: plugin pods %v do not include the dra-example-driver kubelet plugin", r.Node, r.PluginPods)
+		}
+	}
+	if allocated != allocatedGPUs {
+		t.Errorf("allocated GPUs across workers: got %d, want %d", allocated, allocatedGPUs)
+	}
+}
+
 func TestMap(t *testing.T) {
 	s := cluster(t)
 	podNode := make(map[string]string)
@@ -209,9 +264,10 @@ func TestMap(t *testing.T) {
 		"pod/two-gpus":      {rows: 2, status: "Allocated"},
 		"pod/missing-class": {rows: 1, status: "Pending"},
 		"pod/no-match":      {rows: 1, status: "Pending"},
+		"":                  {rows: 1, status: "Pending"}, // claim unused
 	}
-	if len(rows) != 5 {
-		t.Errorf("rows: got %d, want 5: %+v", len(rows), rows)
+	if len(rows) != 6 {
+		t.Errorf("rows: got %d, want 6: %+v", len(rows), rows)
 	}
 	for consumer, w := range want {
 		got := byConsumer[consumer]
@@ -234,6 +290,55 @@ func TestMap(t *testing.T) {
 	if got := byConsumer["pod/one-gpu"]; len(got) == 1 && !strings.HasPrefix(got[0].Claim, "one-gpu-gpu-") {
 		t.Errorf("pod/one-gpu: claim %q should be generated from its template", got[0].Claim)
 	}
+}
+
+func TestWhy(t *testing.T) {
+	type explanation struct {
+		Claim     string `json:"claim"`
+		Verdict   string `json:"verdict"`
+		Summary   string `json:"summary"`
+		Allocator *struct {
+			NodesTried int      `json:"nodesTried"`
+			Nodes      []string `json:"nodes"`
+			Error      string   `json:"error"`
+		} `json:"allocator"`
+	}
+	why := func(target string) explanation {
+		t.Helper()
+		got := decode[struct{ Explanations []explanation }](t, kubectlDRA(t, "why", target, "-n", e2eNamespace, "-o", "json")).Explanations
+		if len(got) != 1 {
+			t.Fatalf("why %s: got %d explanations, want 1", target, len(got))
+		}
+		return got[0]
+	}
+
+	tests := []struct {
+		target, verdict, summary string
+	}{
+		{"pod/one-gpu", "ALLOCATED", "1 device(s) allocated"},
+		{"two-gpus", "ALLOCATED", "2 device(s) allocated"},
+		{"missing-class", "NOT ALLOCATABLE", `DeviceClass "does-not-exist" does not exist`},
+		{"pod/no-match", "NOT ALLOCATABLE", "0 match the request selectors"},
+		// The allocator runs against live cluster state here.
+		{"unused", "ALLOCATABLE", "the allocator finds devices on"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.target, func(t *testing.T) {
+			e := why(tt.target)
+			if e.Verdict != tt.verdict || !strings.Contains(e.Summary, tt.summary) {
+				t.Errorf("got %s: %s\nwant %s: ...%s...", e.Verdict, e.Summary, tt.verdict, tt.summary)
+			}
+		})
+	}
+
+	t.Run("allocator agrees for the pending pod", func(t *testing.T) {
+		// The control plane's NoSchedule taint excludes it, so only the
+		// workers are candidates, and none can allocate.
+		e := why("pod/no-match")
+		if e.Allocator == nil || e.Allocator.NodesTried != 2 || len(e.Allocator.Nodes) != 0 || e.Allocator.Error != "" {
+			t.Errorf("allocator: %+v", e.Allocator)
+		}
+	})
 }
 
 func TestDevices(t *testing.T) {
