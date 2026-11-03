@@ -2,8 +2,8 @@
 
 This guide explains what each kubectl-dra command does, how it reaches its
 answer, and when to use it. The [README](../../README.md) has a one-line
-summary of each command; [design.md](../design.md) records the design
-decisions behind them.
+summary of each command; the [glossary](../glossary.md) defines the DRA and
+kubectl-dra terms used throughout.
 
 | Command | Use it when |
 |---|---|

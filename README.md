@@ -387,8 +387,8 @@ capacity: for those, the allocator's verdict is shown without a breakdown.
 
 The [command guide](docs/commands/README.md) explains the concepts every
 command shares (pools and generations, where a device can be used, when it
-counts as allocated, taints). Design decisions and the upstream behaviour
-the analyzers mirror are recorded in [docs/design.md](docs/design.md).
+counts as allocated, taints). The [glossary](docs/glossary.md) defines every
+DRA and kubectl-dra term used in the output and the docs.
 
 ## Development
 
