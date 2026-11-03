@@ -155,7 +155,8 @@ func runDevices(ctx context.Context, o *Options, s *snapshot.Snapshot, f devices
 	}
 
 	wide := o.output == outputWide
-	w := newTable(o.Out)
+	tw := newTable(o.Out)
+	w := tableOut(tw, s.Nodes, wide)
 	fmt.Fprint(w, "DRIVER\tPOOL\tDEVICE\tNODES\tSTATUS\tCLAIMS")
 	if wide {
 		fmt.Fprint(w, "\tTAINTS\tREASON\tATTRIBUTES")
@@ -168,7 +169,7 @@ func runDevices(ctx context.Context, o *Options, s *snapshot.Snapshot, f devices
 		}
 		fmt.Fprintln(w)
 	}
-	return w.Flush()
+	return flushTable(o, tw, w)
 }
 
 func newDeviceRow(d *analyze.DeviceInfo) deviceRow {

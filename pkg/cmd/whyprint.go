@@ -90,9 +90,12 @@ func printExplanation(w io.Writer, e *analyze.Explanation, st style) {
 
 	if a := e.Allocator; a != nil {
 		section(w, st, "Allocator")
-		if len(a.Nodes) > 0 {
+		switch {
+		case len(a.Nodes) > 0:
 			fmt.Fprintf(w, "  %s devices found on %d of %d candidate nodes: %s\n", st.green("✓"), len(a.Nodes), a.NodesTried, strings.Join(a.Nodes, ", "))
-		} else {
+		case a.Error != "":
+			fmt.Fprintf(w, "  %s rejects the claim on every candidate node: %s\n", st.red("✗"), a.Error)
+		default:
 			fmt.Fprintf(w, "  %s no allocation on any of the %d candidate nodes\n", st.red("✗"), a.NodesTried)
 		}
 		if len(a.AbortingNodes) > 0 {

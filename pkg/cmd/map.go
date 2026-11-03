@@ -136,7 +136,8 @@ func runMap(o *Options, s *snapshot.Snapshot, namespace string) error {
 	}
 
 	wide := o.output == outputWide
-	w := newTable(o.Out)
+	tw := newTable(o.Out)
+	w := tableOut(tw, s.Nodes, wide)
 	if namespace == "" {
 		fmt.Fprint(w, "NAMESPACE\t")
 	}
@@ -160,7 +161,7 @@ func runMap(o *Options, s *snapshot.Snapshot, namespace string) error {
 		}
 		fmt.Fprintln(w)
 	}
-	return w.Flush()
+	return flushTable(o, tw, w)
 }
 
 // claimRows returns one row per consumer and allocated device, or per

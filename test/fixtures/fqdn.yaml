@@ -1,0 +1,69 @@
+# Shaped like a managed cluster: fully qualified node names sharing a DNS
+# suffix, one GPU node whose pool is named after it, devices published out
+# of order, and a pending pod that cannot reach the GPUs.
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Node
+  metadata:
+    name: gpu-node-1.zone-a.example.com
+    labels: {kubernetes.io/hostname: gpu-node-1.zone-a.example.com}
+- apiVersion: v1
+  kind: Node
+  metadata:
+    name: cpu-node-1.zone-a.example.com
+    labels: {kubernetes.io/hostname: cpu-node-1.zone-a.example.com}
+- apiVersion: resource.k8s.io/v1
+  kind: DeviceClass
+  metadata: {name: gpu.example.com}
+  spec:
+    selectors:
+    - cel: {expression: "device.driver == 'gpu.example.com'"}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceSlice
+  metadata: {name: gpu-node-1-gpu.example.com-x7k2p}
+  spec:
+    driver: gpu.example.com
+    nodeName: gpu-node-1.zone-a.example.com
+    pool: {name: gpu-node-1.zone-a.example.com, generation: 1, resourceSliceCount: 1}
+    devices:
+    - {name: gpu-2, attributes: {model: {string: A100}}, capacity: {memory: {value: 80Gi}}}
+    - {name: gpu-3, attributes: {model: {string: A100}}, capacity: {memory: {value: 80Gi}}}
+    - {name: gpu-10, attributes: {model: {string: A100}}, capacity: {memory: {value: 80Gi}}}
+    - {name: gpu-0, attributes: {model: {string: A100}}, capacity: {memory: {value: 80Gi}}}
+    - {name: gpu-1, attributes: {model: {string: A100}}, capacity: {memory: {value: 80Gi}}}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: training, namespace: ml}
+  spec:
+    devices:
+      requests:
+      - name: gpus
+        exactly: {deviceClassName: gpu.example.com, count: 2}
+  status:
+    allocation:
+      devices:
+        results:
+        - {request: gpus, driver: gpu.example.com, pool: gpu-node-1.zone-a.example.com, device: gpu-2}
+        - {request: gpus, driver: gpu.example.com, pool: gpu-node-1.zone-a.example.com, device: gpu-3}
+      nodeSelector:
+        nodeSelectorTerms:
+        - matchFields:
+          - {key: metadata.name, operator: In, values: [gpu-node-1.zone-a.example.com]}
+- apiVersion: resource.k8s.io/v1
+  kind: ResourceClaim
+  metadata: {name: on-cpu-node, namespace: ml}
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly: {deviceClassName: gpu.example.com}
+- apiVersion: v1
+  kind: Pod
+  metadata: {name: on-cpu-node, namespace: ml, uid: 00000000-0000-0000-0000-0000000000f1}
+  spec:
+    nodeSelector: {kubernetes.io/hostname: cpu-node-1.zone-a.example.com}
+    containers: [{name: c, image: pause}]
+    resourceClaims: [{name: gpu, resourceClaimName: on-cpu-node}]
+  status: {phase: Pending}

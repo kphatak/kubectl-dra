@@ -1,0 +1,31 @@
+Claim:    ml/on-cpu-node
+Pod:      ml/on-cpu-node
+Verdict:  NOT ALLOCATABLE
+Reason:   request "gpu": none of the remaining devices (3) can be used on a candidate node
+
+Candidate nodes
+  The pod can run on 1 of 2 nodes.
+  ✗ 1 does not match the pod's nodeSelector or node affinity: gpu-node-1
+
+Request "gpu": 1 device from class gpu.example.com
+  STAGE                           LEFT   DROPPED
+  published                          5
+  in usable pools                    5
+  match the class                    5
+  match the request selectors        5
+  not allocated to other claims      3   -2 allocated to another claim
+                                              gpu.example.com/gpu-node-1/gpu-2  ml/training
+                                              gpu.example.com/gpu-node-1/gpu-3  ml/training
+  taints tolerated                   3
+  reachable from candidate nodes     0   -3 usable only on gpu-node-1, which is not a candidate node
+                                              gpu.example.com/gpu-node-1/gpu-0
+                                              gpu.example.com/gpu-node-1/gpu-1
+                                              gpu.example.com/gpu-node-1/gpu-10
+  ✗ none of the remaining devices (3) can be used on a candidate node
+
+Allocator
+  ✗ no allocation on any of the 1 candidate nodes
+  features assumed: none
+
+Next steps
+  • The matching devices are on nodes the pod cannot use. Check the pod's nodeSelector, affinity and tolerations

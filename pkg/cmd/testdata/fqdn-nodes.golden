@@ -1,0 +1,3 @@
+NODE         DRIVERS           DEVICES   ALLOCATED   FREE   ISSUES
+cpu-node-1   <none>            0         0           0      <none>
+gpu-node-1   gpu.example.com   5         2           3      <none>

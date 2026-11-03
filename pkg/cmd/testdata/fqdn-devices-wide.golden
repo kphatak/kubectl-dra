@@ -1,0 +1,6 @@
+DRIVER            POOL                            DEVICE   NODES                           STATUS      CLAIMS        TAINTS   REASON   ATTRIBUTES
+gpu.example.com   gpu-node-1.zone-a.example.com   gpu-0    gpu-node-1.zone-a.example.com   Free        <none>        <none>   <none>   model=A100
+gpu.example.com   gpu-node-1.zone-a.example.com   gpu-1    gpu-node-1.zone-a.example.com   Free        <none>        <none>   <none>   model=A100
+gpu.example.com   gpu-node-1.zone-a.example.com   gpu-2    gpu-node-1.zone-a.example.com   Allocated   ml/training   <none>   <none>   model=A100
+gpu.example.com   gpu-node-1.zone-a.example.com   gpu-3    gpu-node-1.zone-a.example.com   Allocated   ml/training   <none>   <none>   model=A100
+gpu.example.com   gpu-node-1.zone-a.example.com   gpu-10   gpu-node-1.zone-a.example.com   Free        <none>        <none>   <none>   model=A100

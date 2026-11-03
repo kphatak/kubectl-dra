@@ -108,6 +108,15 @@ func TestWhyDetails(t *testing.T) {
 		}
 	})
 
+	t.Run("an error every node shares is reported once, not per node", func(t *testing.T) {
+		// A missing DeviceClass fails the allocator identically on all
+		// three nodes. That is the claim's fault, not the nodes'.
+		a := explain("unknown-class").Allocator
+		if !strings.Contains(a.Error, "missing") || len(a.AbortingNodes) != 0 || len(a.NodeErrors) != 0 {
+			t.Errorf("allocator: %+v", a)
+		}
+	})
+
 	t.Run("an error on one node does not hide success on another", func(t *testing.T) {
 		// all-l4 asks for all matching devices. On node-c the pool is
 		// incomplete, which is a fatal error for the allocator there.
@@ -127,7 +136,7 @@ func TestWhyDetails(t *testing.T) {
 
 func TestWhyText(t *testing.T) {
 	s := loadFixtures(t, "why.yaml")
-	for _, target := range []string{"request-false", "all-busy", "first-available", "wrong-zone", "pod/pending-pod", "pod/not-yet"} {
+	for _, target := range []string{"request-false", "all-busy", "first-available", "wrong-zone", "unknown-class", "pod/pending-pod", "pod/not-yet"} {
 		t.Run(target, func(t *testing.T) {
 			o, out, _ := testOptions(outputTable)
 			if err := runWhy(context.Background(), o, s, "why", target); err != nil {

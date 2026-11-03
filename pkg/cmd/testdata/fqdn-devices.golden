@@ -1,0 +1,6 @@
+DRIVER            POOL         DEVICE   NODES        STATUS      CLAIMS
+gpu.example.com   gpu-node-1   gpu-0    gpu-node-1   Free        <none>
+gpu.example.com   gpu-node-1   gpu-1    gpu-node-1   Free        <none>
+gpu.example.com   gpu-node-1   gpu-2    gpu-node-1   Allocated   ml/training
+gpu.example.com   gpu-node-1   gpu-3    gpu-node-1   Allocated   ml/training
+gpu.example.com   gpu-node-1   gpu-10   gpu-node-1   Free        <none>

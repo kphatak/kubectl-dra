@@ -1,0 +1,13 @@
+Claim:    why/unknown-class
+Verdict:  NOT ALLOCATABLE
+Reason:   DeviceClass "missing" does not exist
+
+Request "gpu": 1 device from class missing
+  ✗ DeviceClass "missing" does not exist
+
+Allocator
+  ✗ rejects the claim on every candidate node: claim why/unknown-class, request gpu: could not retrieve device class missing: deviceclasses.resource.k8s.io "missing" not found
+  features assumed: DRAPrioritizedList
+
+Next steps
+  • Create DeviceClass "missing", or fix deviceClassName in request "gpu". List classes with: kubectl get deviceclasses

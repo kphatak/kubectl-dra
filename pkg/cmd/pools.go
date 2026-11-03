@@ -127,7 +127,8 @@ func runPools(o *Options, s *snapshot.Snapshot, f poolsFlags) error {
 	}
 
 	wide := o.output == outputWide
-	w := newTable(o.Out)
+	tw := newTable(o.Out)
+	w := tableOut(tw, s.Nodes, wide)
 	fmt.Fprint(w, "DRIVER\tPOOL\tNODES\tGENERATION\tSLICES\tDEVICES\tALLOCATED\tSTATUS")
 	if wide {
 		fmt.Fprint(w, "\tOUTDATED SLICES\tPROBLEMS")
@@ -150,7 +151,7 @@ func runPools(o *Options, s *snapshot.Snapshot, f poolsFlags) error {
 		}
 		fmt.Fprintln(w)
 	}
-	return w.Flush()
+	return flushTable(o, tw, w)
 }
 
 func newPoolRow(p *analyze.Pool, allocations *analyze.Allocations) poolRow {

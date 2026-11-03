@@ -123,5 +123,22 @@ is an empty list (`{"pools": []}`), never `null`, so scripts do not need a
 special case. Tables print `<none>` for empty cells, and a message on stderr
 when there are no rows.
 
+**Short node names.** On clusters whose node names share a DNS suffix, such
+as `node-1.zone-a.example.com`, the default table (and `why`'s
+text) drops that suffix wherever a node name appears, including pool names
+and device IDs, and says so on stderr:
+
+```
+Node names are shown without ".zone-a.example.com"; use -o wide for full names.
+```
+
+`-o wide`, `-o json` and `-o yaml` always print full names, which is what
+other kubectl commands need. Clusters whose node names have no common
+suffix, such as kind, are unaffected.
+
+**Device order.** Devices are listed by name within each pool, with numbers
+compared by value (`gpu-2` before `gpu-10`), whatever order the driver
+published them in.
+
 All commands also accept kubectl's connection flags (`--context`,
 `--kubeconfig`, `--as`, and so on) and `-n` / `-A`.

@@ -203,6 +203,11 @@ scheduling attempt, even if another node would have worked, so an
 with an error is the verdict `ERROR`, unless the funnel already has a clearer
 answer, such as a missing DeviceClass.
 
+When every candidate node fails with the same error, the error belongs to
+the claim, not to any node (a missing DeviceClass is the usual case). The
+Allocator section then shows it once, as "rejects the claim on every
+candidate node", instead of listing each node as aborting.
+
 ### 5. Allocated claims with a pending pod
 
 For an allocated claim, `why` lists the devices. If the pod is not

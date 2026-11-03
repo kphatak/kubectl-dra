@@ -85,6 +85,8 @@ type AllocatorCheck struct {
 	AbortingNodes []string `json:"abortingNodes,omitempty"`
 	// Error is set when the allocator fails on every node it tried, or
 	// cannot start, which is an input problem such as a missing class.
+	// When every node failed with this same error, AbortingNodes and
+	// NodeErrors are left empty, since no node is to blame.
 	Error string `json:"error,omitempty"`
 }
 
@@ -114,6 +116,7 @@ func CheckWithAllocator(ctx context.Context, claim *resourceapi.ResourceClaim, a
 		return check
 	}
 
+	fatal := map[string]bool{}
 	firstFatal := ""
 	for _, node := range nodes {
 		check.NodesTried++
@@ -124,6 +127,7 @@ func CheckWithAllocator(ctx context.Context, claim *resourceapi.ResourceClaim, a
 		case err != nil:
 			check.AbortingNodes = append(check.AbortingNodes, node.Name)
 			check.NodeErrors = append(check.NodeErrors, fmt.Sprintf("%s: %v", node.Name, err))
+			fatal[err.Error()] = true
 			if firstFatal == "" {
 				firstFatal = err.Error()
 			}
@@ -133,6 +137,12 @@ func CheckWithAllocator(ctx context.Context, claim *resourceapi.ResourceClaim, a
 	}
 	if len(check.Nodes) == 0 && len(check.AbortingNodes) > 0 && len(check.AbortingNodes) == check.NodesTried {
 		check.Error = firstFatal
+		// The same error on every node, such as a missing DeviceClass,
+		// is a problem with the claim, not with any node: report it once.
+		if len(fatal) == 1 {
+			check.AbortingNodes = nil
+			check.NodeErrors = nil
+		}
 	}
 	return check
 }

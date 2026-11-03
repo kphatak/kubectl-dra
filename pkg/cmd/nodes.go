@@ -121,7 +121,8 @@ func runNodes(o *Options, s *snapshot.Snapshot, f nodesFlags) error {
 	}
 
 	wide := o.output == outputWide
-	w := newTable(o.Out)
+	tw := newTable(o.Out)
+	w := tableOut(tw, s.Nodes, wide)
 	fmt.Fprint(w, "NODE\tDRIVERS\tDEVICES\tALLOCATED\tFREE")
 	if wide {
 		fmt.Fprint(w, "\tTAINTED\tUNAVAILABLE\tREACHABLE\tPLUGIN PODS")
@@ -134,5 +135,5 @@ func runNodes(o *Options, s *snapshot.Snapshot, f nodesFlags) error {
 		}
 		fmt.Fprintf(w, "\t%s\n", orNone(strings.Join(r.Issues, "; ")))
 	}
-	return w.Flush()
+	return flushTable(o, tw, w)
 }

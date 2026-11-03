@@ -1,0 +1,2 @@
+DRIVER            POOL         NODES        GENERATION   SLICES   DEVICES   ALLOCATED   STATUS
+gpu.example.com   gpu-node-1   gpu-node-1   1            1/1      5         2           Complete

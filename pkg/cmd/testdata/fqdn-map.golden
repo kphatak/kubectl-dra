@@ -1,0 +1,4 @@
+NAMESPACE   CONSUMER          CLAIM         REQUEST   DRIVER            POOL         DEVICE   NODE         STATUS
+ml          pod/on-cpu-node   on-cpu-node   gpu       <none>            <none>       <none>   <none>       Pending
+ml          <none>            training      gpus      gpu.example.com   gpu-node-1   gpu-2    gpu-node-1   Allocated
+ml          <none>            training      gpus      gpu.example.com   gpu-node-1   gpu-3    gpu-node-1   Allocated

@@ -80,7 +80,50 @@ func (p *Pool) Devices() []DeviceRef {
 			})
 		}
 	}
+	// Drivers publish devices in any order; list them as people count.
+	sort.SliceStable(refs, func(i, j int) bool { return NaturalLess(refs[i].Device.Name, refs[j].Device.Name) })
 	return refs
+}
+
+// NaturalLess orders strings with embedded numbers by value, so gpu-2 comes
+// before gpu-10. Runs of digits compare as numbers, everything else byte by
+// byte.
+func NaturalLess(a, b string) bool {
+	for a != "" && b != "" {
+		ca, cb := a[0], b[0]
+		if isDigit(ca) && isDigit(cb) {
+			na, nb := digitRun(a), digitRun(b)
+			// Compare by value: strip leading zeros, then length, then
+			// digits.
+			va, vb := strings.TrimLeft(a[:na], "0"), strings.TrimLeft(b[:nb], "0")
+			if len(va) != len(vb) {
+				return len(va) < len(vb)
+			}
+			if va != vb {
+				return va < vb
+			}
+			if na != nb {
+				return na < nb
+			}
+			a, b = a[na:], b[nb:]
+			continue
+		}
+		if ca != cb {
+			return ca < cb
+		}
+		a, b = a[1:], b[1:]
+	}
+	return len(a) < len(b)
+}
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+
+func digitRun(s string) int {
+	n := 0
+	for n < len(s) && isDigit(s[n]) {
+		n++
+	}
+	return n
 }
 
 // ScopeSummary describes where the pool's devices are usable: their common

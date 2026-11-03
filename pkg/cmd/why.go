@@ -114,11 +114,24 @@ func runWhy(ctx context.Context, o *Options, s *snapshot.Snapshot, namespace, ta
 		return printStructured(o.Out, o.output, whyList{Explanations: explanations})
 	}
 	st := newStyle(o.Out)
+	short := nodeShortener{}
+	if o.output != outputWide {
+		short = newNodeShortener(s.Nodes)
+	}
+	shortened := false
 	for i, e := range explanations {
 		if i > 0 {
 			fmt.Fprintf(o.Out, "\n%s\n\n", st.dim(strings.Repeat("─", 60)))
 		}
-		printExplanation(o.Out, e, st)
+		shown, changed, err := shortenExplanation(e, short)
+		if err != nil {
+			return err
+		}
+		shortened = shortened || changed
+		printExplanation(o.Out, shown, st)
+	}
+	if shortened {
+		short.note(o.ErrOut)
 	}
 	return nil
 }
