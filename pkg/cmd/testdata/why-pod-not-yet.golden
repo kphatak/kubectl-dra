@@ -1,5 +1,7 @@
-Claim why/<from template l4>, for pod why/not-yet
-NOT ALLOCATABLE: pod claim "gpu" has no ResourceClaim: not created yet from ResourceClaimTemplate l4
+Claim:    why/<from template l4>
+Pod:      why/not-yet
+Verdict:  NOT ALLOCATABLE
+Reason:   pod claim "gpu" has no ResourceClaim: not created yet from ResourceClaimTemplate l4
 
-Hints:
-  - The resource claim controller creates this claim. Check that ResourceClaimTemplate why/l4 exists: kubectl get resourceclaimtemplate -n why l4
+Next steps
+  • The resource claim controller creates this claim. Check that ResourceClaimTemplate why/l4 exists: kubectl get resourceclaimtemplate -n why l4

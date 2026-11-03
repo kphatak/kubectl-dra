@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -114,13 +113,12 @@ func runWhy(ctx context.Context, o *Options, s *snapshot.Snapshot, namespace, ta
 	case outputJSON, outputYAML:
 		return printStructured(o.Out, o.output, whyList{Explanations: explanations})
 	}
+	st := newStyle(o.Out)
 	for i, e := range explanations {
 		if i > 0 {
-			fmt.Fprintln(o.Out)
+			fmt.Fprintf(o.Out, "\n%s\n\n", st.dim(strings.Repeat("─", 60)))
 		}
-		if err := printExplanation(o.Out, e); err != nil {
-			return err
-		}
+		printExplanation(o.Out, e, st)
 	}
 	return nil
 }
@@ -152,123 +150,6 @@ func missingExplanation(mc analyze.MissingClaim) *analyze.Explanation {
 		e.Hints = []string{fmt.Sprintf("Create ResourceClaim %s/%s, or fix spec.resourceClaims in the pod", mc.Pod.Namespace, mc.ClaimName)}
 	}
 	return e
-}
-
-func printExplanation(w io.Writer, e *analyze.Explanation) error {
-	header := "Claim " + e.Claim
-	if e.Pod != "" {
-		header += ", for pod " + e.Pod
-	}
-	fmt.Fprintln(w, header)
-	fmt.Fprintf(w, "%s: %s\n", e.Verdict, e.Summary)
-
-	if len(e.Allocation) > 0 {
-		fmt.Fprintln(w, "\nAllocated devices:")
-		for _, r := range e.Allocation {
-			fmt.Fprintf(w, "  %s: %s/%s/%s\n", r.Request, r.Driver, r.Pool, r.Device)
-		}
-	}
-	if e.PodScheduled != "" || len(e.Events) > 0 {
-		fmt.Fprintln(w, "\nScheduler:")
-		if e.PodScheduled != "" {
-			fmt.Fprintf(w, "  PodScheduled: %s\n", e.PodScheduled)
-		}
-		for _, ev := range e.Events {
-			fmt.Fprintf(w, "  %s\n", ev)
-		}
-	}
-
-	if e.Pod != "" && (len(e.CandidateNodes) > 0 || len(e.ExcludedNodes) > 0) {
-		total := len(e.CandidateNodes)
-		for _, d := range e.ExcludedNodes {
-			total += d.Count
-		}
-		if len(e.Allocation) > 0 {
-			fmt.Fprintf(w, "\nNodes where the claim's devices are usable: %d; the pod can run on %d\n", total, len(e.CandidateNodes))
-		} else {
-			fmt.Fprintf(w, "\nCandidate nodes (where the pod can run): %d of %d\n", len(e.CandidateNodes), total)
-		}
-		for _, d := range e.ExcludedNodes {
-			fmt.Fprintf(w, "  -%d %s: %s\n", d.Count, d.Reason, strings.Join(d.Examples, ", "))
-		}
-	}
-
-	for _, r := range e.Requests {
-		for i, f := range r.Alternatives {
-			fmt.Fprintln(w)
-			printFunnel(w, r, i, f)
-		}
-	}
-
-	if len(e.PoolWarnings) > 0 {
-		fmt.Fprintln(w, "\nPool warnings:")
-		for _, p := range e.PoolWarnings {
-			fmt.Fprintf(w, "  - %s\n", p)
-		}
-	}
-	if a := e.Allocator; a != nil {
-		features := strings.Join(a.Features, ", ")
-		if features == "" {
-			features = "none"
-		}
-		fmt.Fprintf(w, "\nAllocator: allocation possible on %d of %d candidate nodes (features assumed: %s)\n", len(a.Nodes), a.NodesTried, features)
-		for _, ne := range a.NodeErrors {
-			fmt.Fprintf(w, "  %s\n", ne)
-		}
-	}
-	if len(e.Hints) > 0 {
-		fmt.Fprintln(w, "\nHints:")
-		for _, h := range e.Hints {
-			fmt.Fprintf(w, "  - %s\n", h)
-		}
-	}
-	return nil
-}
-
-func printFunnel(w io.Writer, r analyze.RequestExplanation, index int, f analyze.Funnel) {
-	what := fmt.Sprintf("exactly %d", f.Count)
-	if f.AllocationMode == string(resourceapi.DeviceAllocationModeAll) {
-		what = "all"
-	}
-	title := fmt.Sprintf("Request %q: %s from class %s", f.Request, what, f.Class)
-	if len(r.Alternatives) > 1 {
-		title = fmt.Sprintf("Request %q, alternative %d of %d: %s from class %s", r.Name, index+1, len(r.Alternatives), what, f.Class)
-	}
-	if f.AdminAccess {
-		title += ", admin access"
-	}
-	status := "not satisfiable"
-	if f.Satisfiable {
-		status = fmt.Sprintf("satisfiable on %d node(s)", len(f.Nodes))
-	}
-	fmt.Fprintf(w, "%s (%s)\n", title, status)
-	if f.Error != "" {
-		fmt.Fprintf(w, "  error: %s\n", f.Error)
-	}
-	if len(f.Stages) == 0 {
-		fmt.Fprintf(w, "  %s\n", f.Problem)
-		return
-	}
-
-	tw := newTable(w)
-	for _, s := range f.Stages {
-		fmt.Fprintf(tw, "  %s\t%d\n", s.Name, s.Remaining)
-		for _, d := range s.Dropped {
-			fmt.Fprintf(tw, "  \t-%d\t%s\n", d.Count, d.Reason)
-			for _, ex := range d.Examples {
-				fmt.Fprintf(tw, "  \t\t  e.g. %s\n", ex)
-			}
-		}
-		if s.Remaining == 0 {
-			break
-		}
-	}
-	_ = tw.Flush()
-	if f.Satisfiable {
-		fmt.Fprintf(w, "  needs %d on one node; best node %s has %d\n", f.Need, f.BestNode, f.BestCount)
-	} else if f.Problem != "" && f.Error == "" {
-		fmt.Fprintf(w, "  %s\n", f.Problem)
-	}
 }
 
 func findPod(s *snapshot.Snapshot, ns, name string) *corev1.Pod {

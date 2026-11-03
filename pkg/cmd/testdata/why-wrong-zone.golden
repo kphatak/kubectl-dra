@@ -1,0 +1,37 @@
+Claim:    why/wrong-zone
+Pod:      why/wrong-zone
+Verdict:  NOT ALLOCATABLE
+Reason:   request "gpu": none of the remaining devices (2) can be used on a candidate node
+
+Candidate nodes
+  The pod can run on 1 of 3 nodes.
+  ✗ 2 does not match the pod's nodeSelector or node affinity: node-b, node-c
+
+Request "gpu": 1 device from class gpu
+  STAGE                           LEFT   DROPPED
+  published                          8
+  in usable pools                    7   -1 pool gpu.example.com/node-c is incomplete (1 of 2 slices)
+                                              gpu.example.com/node-c/gpu-0
+  match the class                    7
+  match the request selectors        2   -5 selector #0 is false: device.attributes['gpu.example.com'].model == 'L4'
+                                              gpu.example.com/node-a/gpu-0  gpu.example.com/model="A100"
+                                              gpu.example.com/node-a/gpu-1  gpu.example.com/model="A100"
+                                              gpu.example.com/node-a/gpu-2  gpu.example.com/model="A100"
+                                              +2 more
+  not allocated to other claims      2
+  taints tolerated                   2
+  reachable from candidate nodes     0   -2 usable only on node-b, which is not a candidate node
+                                              gpu.example.com/node-b/gpu-0
+                                              gpu.example.com/node-b/gpu-1
+  ✗ none of the remaining devices (2) can be used on a candidate node
+
+Warnings
+  ! pool gpu.example.com/node-c has devices this claim could use but is incomplete (1 of 2 slices); the scheduler does not allocate from it
+
+Allocator
+  ✗ no allocation on any of the 1 candidate nodes
+  features assumed: DRAPrioritizedList
+
+Next steps
+  • The matching devices are on nodes the pod cannot use. Check the pod's nodeSelector, affinity and tolerations
+  • Incomplete pools usually mean a driver is republishing or failing. Check: kubectl dra pools and kubectl dra nodes --issues

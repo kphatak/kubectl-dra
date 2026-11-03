@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -20,15 +21,15 @@ func TestWhyScenarios(t *testing.T) {
 		summary string // substring
 	}{
 		{"unknown-class", analyze.VerdictNotAllocatable, `DeviceClass "missing" does not exist`},
-		{"class-false", analyze.VerdictNotAllocatable, `request "gpu" needs 1 device: 8 published, 7 in usable pools, 0 match the class`},
-		{"request-false", analyze.VerdictNotAllocatable, `7 match the class, 0 match the request selectors`},
+		{"class-false", analyze.VerdictNotAllocatable, `request "gpu": no device matches DeviceClass h100 (7 checked)`},
+		{"request-false", analyze.VerdictNotAllocatable, `no device in class gpu matches the request's selectors (7 checked)`},
 		{"cel-error", analyze.VerdictError, "selector #0: CEL compile error"},
-		{"all-busy", analyze.VerdictNotAllocatable, `5 match the request selectors, 0 not allocated to other claims`},
+		{"all-busy", analyze.VerdictNotAllocatable, `every matching device (5) is allocated to another claim`},
 		{"match-conflict", analyze.VerdictNotAllocatable, "each request can be satisfied on its own, but the allocator rejected every candidate node"},
 		{"first-available", analyze.VerdictAllocatable, "the allocator finds devices on 1 of 3 candidate nodes (node-b)"},
 		{"all-l4", analyze.VerdictAllocatable, "the allocator finds devices on 1 of 3 candidate nodes (node-b), but fails with an error on 1 (node-c)"},
-		{"too-many", analyze.VerdictNotAllocatable, `request "gpus" needs 3 devices on one node: 8 published, 7 in usable pools, 7 match the class, 2 match the request selectors, 2 not allocated to other claims, 2 taints tolerated, 2 reachable from candidate nodes, but the best node, node-b, reaches 2`},
-		{"wrong-zone", analyze.VerdictNotAllocatable, "2 taints tolerated, 0 reachable from candidate nodes"},
+		{"too-many", analyze.VerdictNotAllocatable, `request "gpus" needs 3 devices on one node; the best node, node-b, has 2`},
+		{"wrong-zone", analyze.VerdictNotAllocatable, "none of the remaining devices (2) can be used on a candidate node"},
 		{"bound", analyze.VerdictAllocatedPodPending, "the claim's devices are usable only on node-a, and the pod cannot run there"},
 		{"pod/templated", analyze.VerdictAllocatable, "the allocator finds devices on 1 of 2 candidate nodes (node-b)"},
 		{"pod/not-yet", analyze.VerdictNotAllocatable, "not created yet from ResourceClaimTemplate l4"},
@@ -126,7 +127,7 @@ func TestWhyDetails(t *testing.T) {
 
 func TestWhyText(t *testing.T) {
 	s := loadFixtures(t, "why.yaml")
-	for _, target := range []string{"request-false", "all-busy", "first-available", "pod/pending-pod", "pod/not-yet"} {
+	for _, target := range []string{"request-false", "all-busy", "first-available", "wrong-zone", "pod/pending-pod", "pod/not-yet"} {
 		t.Run(target, func(t *testing.T) {
 			o, out, _ := testOptions(outputTable)
 			if err := runWhy(context.Background(), o, s, "why", target); err != nil {
@@ -134,6 +135,37 @@ func TestWhyText(t *testing.T) {
 			}
 			assertGolden(t, "why-"+strings.ReplaceAll(target, "/", "-"), out.Bytes())
 		})
+	}
+}
+
+// TestWhyColor checks that colored output, once the escape codes are
+// removed, is exactly the plain output, so colors never shift columns.
+func TestWhyColor(t *testing.T) {
+	s := loadFixtures(t, "why.yaml")
+	for _, target := range []string{"all-busy", "first-available", "pod/pending-pod"} {
+		o, plain, _ := testOptions(outputTable)
+		if err := runWhy(context.Background(), o, s, "why", target); err != nil {
+			t.Fatal(err)
+		}
+
+		var colored strings.Builder
+		var e whyList
+		o, out, _ := testOptions(outputJSON)
+		if err := runWhy(context.Background(), o, s, "why", target); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(out.Bytes(), &e); err != nil {
+			t.Fatal(err)
+		}
+		printExplanation(&colored, e.Explanations[0], style{on: true})
+
+		if !strings.Contains(colored.String(), "\x1b[") {
+			t.Errorf("%s: no escape codes in colored output", target)
+		}
+		stripped := regexp.MustCompile("\x1b\\[[0-9;]*m").ReplaceAllString(colored.String(), "")
+		if stripped != plain.String() {
+			t.Errorf("%s: colored output differs from plain once codes are removed:\n%s", target, stripped)
+		}
 	}
 }
 

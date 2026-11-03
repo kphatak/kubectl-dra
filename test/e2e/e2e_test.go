@@ -318,7 +318,7 @@ func TestWhy(t *testing.T) {
 		{"pod/one-gpu", "ALLOCATED", "1 device(s) allocated"},
 		{"two-gpus", "ALLOCATED", "2 device(s) allocated"},
 		{"missing-class", "NOT ALLOCATABLE", `DeviceClass "does-not-exist" does not exist`},
-		{"pod/no-match", "NOT ALLOCATABLE", "0 match the request selectors"},
+		{"pod/no-match", "NOT ALLOCATABLE", "matches the request's selectors"},
 		// The allocator runs against live cluster state here.
 		{"unused", "ALLOCATABLE", "the allocator finds devices on"},
 	}

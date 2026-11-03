@@ -433,25 +433,48 @@ func (env *whyEnv) countAll(f *Funnel, matching []*DeviceInfo, have map[string]i
 	}
 }
 
-// funnelProblem summarizes a failed funnel as a chain of stage counts, up
-// to the stage where nothing is left or, if devices remain, the best node.
+// funnelProblem says in one sentence why a funnel failed: what happened at
+// the first stage that left no device, or, if devices remain, how far the
+// best node falls short. The stage counts themselves are in the funnel.
 func funnelProblem(f *Funnel) string {
-	plural := "devices"
-	if f.Need == 1 {
-		plural = "device"
-	}
-	var chain []string
-	for _, s := range f.Stages {
-		chain = append(chain, fmt.Sprintf("%d %s", s.Remaining, s.Name))
-		if s.Remaining == 0 {
-			return fmt.Sprintf("request %q needs %d %s: %s", f.Request, f.Need, plural, strings.Join(chain, ", "))
+	for i, s := range f.Stages {
+		if s.Remaining > 0 {
+			continue
 		}
+		before := 0
+		if i > 0 {
+			before = f.Stages[i-1].Remaining
+		}
+		var why string
+		switch s.Name {
+		case StagePublished:
+			why = "no driver publishes any device"
+		case StageUsable:
+			why = fmt.Sprintf("every published device (%d) is in a pool the scheduler cannot use", before)
+		case StageClass:
+			why = fmt.Sprintf("no device matches DeviceClass %s (%d checked)", f.Class, before)
+		case StageSelectors:
+			why = fmt.Sprintf("no device in class %s matches the request's selectors (%d checked)", f.Class, before)
+		case StageFree:
+			why = fmt.Sprintf("every matching device (%d) is allocated to another claim", before)
+		case StageTaints:
+			why = fmt.Sprintf("every free matching device (%d) has a taint the request does not tolerate", before)
+		case StageNodes:
+			why = fmt.Sprintf("none of the remaining devices (%d) can be used on a candidate node", before)
+		default:
+			why = "no device is left after " + s.Name
+		}
+		return fmt.Sprintf("request %q: %s", f.Request, why)
 	}
-	best := "no candidate node reaches any of them"
-	if f.BestNode != "" {
-		best = fmt.Sprintf("the best node, %s, reaches %d", f.BestNode, f.BestCount)
+
+	needs := fmt.Sprintf("%d devices", f.Need)
+	if f.Need == 1 {
+		needs = "1 device"
 	}
-	return fmt.Sprintf("request %q needs %d %s on one node: %s, but %s", f.Request, f.Need, plural, strings.Join(chain, ", "), best)
+	if f.BestNode == "" {
+		return fmt.Sprintf("request %q needs %s on one node, and no candidate node can use any of the matching devices", f.Request, needs)
+	}
+	return fmt.Sprintf("request %q needs %s on one node; the best node, %s, has %d", f.Request, needs, f.BestNode, f.BestCount)
 }
 
 // verdict combines the funnels with the allocator's answer. The allocator

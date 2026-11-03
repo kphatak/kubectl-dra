@@ -29,40 +29,47 @@ verdict is the scheduler's verdict, not a guess.
 
 ```console
 $ kubectl dra why all-busy -n why
-Claim why/all-busy
-NOT ALLOCATABLE: request "gpu" needs 1 device: 8 published, 7 in usable pools, 5 match the class, 5 match the request selectors, 0 not allocated to other claims
+Claim:    why/all-busy
+Verdict:  NOT ALLOCATABLE
+Reason:   request "gpu": every matching device (5) is allocated to another claim
 
-Request "gpu": exactly 1 from class a100 (not satisfiable)
-  published                       8
-  in usable pools                 7
-                                  -1   pool gpu.example.com/node-c is incomplete (1 of 2 slices)
-                                         e.g. gpu.example.com/node-c/gpu-0
-  match the class                 5
-                                  -2   class selector #1 is false: device.attributes['gpu.example.com'].model == 'A100'
-                                         e.g. gpu.example.com/node-b/gpu-0 (gpu.example.com/model="L4")
-                                         e.g. gpu.example.com/node-b/gpu-1 (gpu.example.com/model="L4")
-  match the request selectors     5
-  not allocated to other claims   0
-                                  -5   allocated to another claim
-                                         e.g. gpu.example.com/node-a/gpu-0 (other/holder)
-                                         e.g. gpu.example.com/node-a/gpu-1 (other/holder)
-                                         e.g. gpu.example.com/node-a/gpu-2 (other/holder)
-  request "gpu" needs 1 device: 8 published, 7 in usable pools, 5 match the class, 5 match the request selectors, 0 not allocated to other claims
+Request "gpu": 1 device from class a100
+  STAGE                           LEFT   DROPPED
+  published                          8
+  in usable pools                    7   -1 pool gpu.example.com/node-c is incomplete (1 of 2 slices)
+                                              gpu.example.com/node-c/gpu-0
+  match the class                    5   -2 class selector #1 is false: device.attributes['gpu.example.com'].model == 'A100'
+                                              gpu.example.com/node-b/gpu-0  gpu.example.com/model="L4"
+                                              gpu.example.com/node-b/gpu-1  gpu.example.com/model="L4"
+  match the request selectors        5
+  not allocated to other claims      0   -5 allocated to another claim
+                                              gpu.example.com/node-a/gpu-0  other/holder
+                                              gpu.example.com/node-a/gpu-1  other/holder
+                                              gpu.example.com/node-a/gpu-2  other/holder
+                                              +2 more
+  ✗ every matching device (5) is allocated to another claim
 
-Pool warnings:
-  - pool gpu.example.com/node-c has devices this claim could use but is incomplete (1 of 2 slices); the scheduler does not allocate from it
+Warnings
+  ! pool gpu.example.com/node-c has devices this claim could use but is incomplete (1 of 2 slices); the scheduler does not allocate from it
 
-Allocator: allocation possible on 0 of 3 candidate nodes (features assumed: DRAPrioritizedList)
+Allocator
+  ✗ no allocation on any of the 3 candidate nodes
+  features assumed: DRAPrioritizedList
 
-Hints:
-  - Every matching device is in use. See holders with: kubectl dra devices --class a100
-  - Incomplete pools usually mean a driver is republishing or failing. Check: kubectl dra pools and kubectl dra nodes --issues
+Next steps
+  • Every matching device is in use. See holders with: kubectl dra devices --class a100
+  • Incomplete pools usually mean a driver is republishing or failing. Check: kubectl dra pools and kubectl dra nodes --issues
 ```
 
 Read it top down. Five A100s exist and match; all five are held by
 `other/holder`. A sixth A100 exists on `node-c`, but its pool is incomplete,
 so the scheduler cannot use it either; fixing the driver on `node-c` would
 unblock the claim.
+
+On a terminal the verdict is colored (green when allocated or allocatable,
+yellow for a pending pod, red otherwise), as are the `✓`, `✗` and `!`
+markers and the stage where the devices run out. Set `NO_COLOR=1` to turn
+colors off. Output to a pipe or a file is never colored.
 
 ## Targets
 
@@ -100,8 +107,9 @@ Node affinity and taint matching use the upstream component-helpers, as the
 scheduler does. Excluded nodes are listed with the reason, grouped:
 
 ```
-Candidate nodes (where the pod can run): 1 of 3
-  -2 does not match the pod's nodeSelector or node affinity: node-b, node-c
+Candidate nodes
+  The pod can run on 1 of 3 nodes.
+  ✗ 2 does not match the pod's nodeSelector or node affinity: node-b, node-c
 ```
 
 A claim without a pod uses all nodes.
@@ -109,8 +117,12 @@ A claim without a pod uses all nodes.
 ### 2. The funnel
 
 Each request, and each alternative of a `firstAvailable` request in order,
-goes through these stages. Each line shows how many devices remain, how many
-were dropped and why, with up to three examples per reason.
+goes through these stages. Each line shows how many devices remain (`LEFT`)
+and, on the same line, how many were dropped and why (`DROPPED`). Under each
+reason come up to three example devices, each with what made it drop (an
+attribute value, or the claim holding it), and a count of the rest. The last
+line of each request is its result: `✓ satisfiable` with the best node, or
+`✗` and the reason.
 
 | Stage | Drops devices that |
 |---|---|
@@ -207,21 +219,24 @@ node selector, affinity or taints.
 
 ```console
 $ kubectl dra why pod/pending-pod -n why
-Claim why/bound, for pod why/pending-pod
-ALLOCATED, POD PENDING: the claim's devices are usable only on node-a, and the pod cannot run there
+Claim:    why/bound
+Pod:      why/pending-pod
+Verdict:  ALLOCATED, POD PENDING
+Reason:   the claim's devices are usable only on node-a, and the pod cannot run there
 
-Allocated devices:
-  gpu: gpu.example.com/node-a/gpu-4
+Allocated devices
+  gpu  gpu.example.com/node-a/gpu-4
 
-Scheduler:
-  PodScheduled: 0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 1 node(s) had untolerated taint {dedicated: infra}, 1 node(s) cannot allocate all claims.
-  FailedScheduling: 0/3 nodes are available: 1 node(s) cannot allocate all claims.
+Scheduler
+  PodScheduled      0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 1 node(s) had untolerated taint {dedicated: infra}, 1 node(s) cannot allocate all claims.
+  FailedScheduling  0/3 nodes are available: 1 node(s) cannot allocate all claims.
 
-Nodes where the claim's devices are usable: 1; the pod can run on 0
-  -1 does not match the pod's nodeSelector or node affinity: node-a
+Nodes
+  The claim's devices are usable on 1 node; the pod can run on 0 of them.
+  ✗ 1 does not match the pod's nodeSelector or node affinity: node-a
 
-Hints:
-  - The pod's nodeSelector, affinity or tolerations exclude the nodes where the claim's devices are; fix the pod, or delete the claim so it is allocated again
+Next steps
+  • The pod's nodeSelector, affinity or tolerations exclude the nodes where the claim's devices are; fix the pod, or delete the claim so it is allocated again
 ```
 
 It also notices when a claim's `reservedFor` list is full, so no further pod
