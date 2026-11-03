@@ -65,12 +65,18 @@ Hints:
 | [`pools`](#kubectl-dra-pools) | Is each driver's pool complete enough for the scheduler to use? |
 | [`nodes`](#kubectl-dra-nodes) | What does each node have, and which nodes look misconfigured? |
 
+The sections below are short. The [command guide](docs/commands/README.md)
+has a full page per command: why it matters, how it reaches its answer, its
+limits, and its JSON fields.
+
 All commands accept the usual kubeconfig flags (`--context`, `--kubeconfig`,
 `-n`, `-A`, and the rest of `kubectl`'s connection flags) and
 `-o table|wide|json|yaml`. JSON and YAML output use a stable report schema
 meant for scripts and CI, not raw Kubernetes objects.
 
 ### kubectl dra why
+
+Full guide: [docs/commands/why.md](docs/commands/why.md)
 
 ```
 kubectl dra why CLAIM -n NAMESPACE
@@ -122,6 +128,8 @@ The hints at the end point at the next read-only command to run.
 
 ### kubectl dra map
 
+Full guide: [docs/commands/map.md](docs/commands/map.md)
+
 ```
 kubectl dra map [-n NAMESPACE | -A] [-o wide]
 ```
@@ -151,6 +159,8 @@ team-a      <none>                  orphan           gpu         gpu.example.com
 - `-o wide` adds whether each consumer is in `status.reservedFor`, and the reason for `Missing` and `NotCreated` rows.
 
 ### kubectl dra devices
+
+Full guide: [docs/commands/devices.md](docs/commands/devices.md)
 
 ```
 kubectl dra devices [--node NODE] [--driver DRIVER] [--class CLASS] [--free] [-o wide]
@@ -186,6 +196,8 @@ Claims with admin access are listed but do not make a device busy.
 
 ### kubectl dra pools
 
+Full guide: [docs/commands/pools.md](docs/commands/pools.md)
+
 ```
 kubectl dra pools [--driver DRIVER] [--node NODE] [-o wide]
 ```
@@ -212,6 +224,8 @@ devices simply never get picked. `SLICES` is slices seen over
 `-o wide` adds outdated slices from older generations and the problem text.
 
 ### kubectl dra nodes
+
+Full guide: [docs/commands/nodes.md](docs/commands/nodes.md)
 
 ```
 kubectl dra nodes [--issues] [-o wide]
@@ -337,8 +351,10 @@ capacity: for those, the allocator's verdict is shown without a breakdown.
 - **The scheduler's view.** DeviceTaintRules are applied to slices the way the scheduler's slice tracker applies them. Allocated state follows kube-scheduler's own bookkeeping: admin access does not hold a device, and shared allocations count as shared.
 - **Features are inferred.** The allocator's optional features are turned on when the cluster's objects use them, because the scheduler's feature gates cannot be read from outside. `why` prints the features it assumed.
 
-Design decisions and the upstream behaviour the analyzers mirror are recorded
-in [docs/design.md](docs/design.md).
+The [command guide](docs/commands/README.md) explains the concepts every
+command shares (pools and generations, where a device can be used, when it
+counts as allocated, taints). Design decisions and the upstream behaviour
+the analyzers mirror are recorded in [docs/design.md](docs/design.md).
 
 ## Development
 
